@@ -1,6 +1,59 @@
 import { drawNode } from "./draw";
 import { Node } from "./state";
 
+const WAIT_DECISION_TIME = 2000; // ms
+let decisionTimer: number | null = null;
+let decisionLocked = false;
+let winnerNode: Node | null = null;
+
+function startDecisionTimer() {
+  if (decisionTimer !== null) clearTimeout(decisionTimer);
+  decisionTimer = window.setTimeout(() => {
+    if (nodes.length >= 2) {
+      // Pick a winner randomly
+      const winnerIdx = Math.floor(Math.random() * nodes.length);
+      winnerNode = nodes[winnerIdx];
+      // Remove all other nodes
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        if (nodes[i] !== winnerNode) {
+          // Remove from touchIdToNode as well
+          for (const [id, node] of touchIdToNode.entries()) {
+            if (node === nodes[i]) touchIdToNode.delete(id);
+          }
+          nodes.splice(i, 1);
+        }
+      }
+      decisionLocked = true;
+    }
+    decisionTimer = null;
+  }, WAIT_DECISION_TIME);
+}
+
+function resetDecisionTimerIfNeeded() {
+  if (nodes.length >= 2) {
+    startDecisionTimer();
+  } else {
+    if (decisionTimer !== null) {
+      clearTimeout(decisionTimer);
+      decisionTimer = null;
+    }
+    if (nodes.length < 2) {
+      decisionLocked = false;
+      winnerNode = null;
+    }
+  }
+}
+
+function handleTouchStart(e: TouchEvent) {
+  if (decisionLocked) return;
+  origHandleTouchStart(e);
+  resetDecisionTimerIfNeeded();
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  origHandleTouchEnd(e);
+  resetDecisionTimerIfNeeded();
+}
 const nodes: Node[] = [];
 const touchIdToNode: Map<number, Node> = new Map();
 
@@ -62,7 +115,7 @@ export function initializeApp() {
 
 // ...existing code...
 
-function handleTouchStart(e: TouchEvent) {
+function origHandleTouchStart(e: TouchEvent) {
     e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
@@ -87,7 +140,7 @@ function handleTouchMove(e: TouchEvent) {
     }
 }
 
-function handleTouchEnd(e: TouchEvent) {
+function origHandleTouchEnd(e: TouchEvent) {
     e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];

@@ -11,8 +11,10 @@ const COLOR_LIST = [
 function getAvailableColor(): string {
     // Try to keep colors unique among active nodes
     const usedColors = new Set(nodes.map(n => n.color));
-    for (const color of COLOR_LIST) {
-        if (!usedColors.has(color)) return color;
+    const startIdx = Math.floor(Math.random() * COLOR_LIST.length);
+    for (let i = 0; i < COLOR_LIST.length; i++) {
+      const color = COLOR_LIST[(startIdx + i) % COLOR_LIST.length];
+      if (!usedColors.has(color)) return color;
     }
     // If all colors are used, pick randomly
     return COLOR_LIST[Math.floor(Math.random() * COLOR_LIST.length)];

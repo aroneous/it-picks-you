@@ -1,7 +1,22 @@
 import { drawNode } from "./draw";
 import { Node } from "./state";
 
-const nodes:Node[] = [];
+const nodes: Node[] = [];
+const touchIdToNode: Map<number, Node> = new Map();
+
+const COLOR_LIST = [
+    'red', 'blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink'
+];
+
+function getAvailableColor(): string {
+    // Try to keep colors unique among active nodes
+    const usedColors = new Set(nodes.map(n => n.color));
+    for (const color of COLOR_LIST) {
+        if (!usedColors.has(color)) return color;
+    }
+    // If all colors are used, pick randomly
+    return COLOR_LIST[Math.floor(Math.random() * COLOR_LIST.length)];
+}
 
 export function initializeApp() {
     console.log('Client application initialized');
@@ -28,15 +43,59 @@ export function initializeApp() {
     const ctx = canvas.getContext('2d');
     if (ctx) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const node = new Node('1', 'red', width / 2, height / 2);
-        nodes.push(node);
-        // node.draw(ctx, radius);
-        // drawNode(ctx, width / 2, height / 2, radius, 'blue',
-        //   Math.random() * 2 * Math.PI,
-        //   Math.random() * 2 * Math.PI);
     }
-    
+
+    // Touch event handlers
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
     requestAnimationFrame(step);
+
+    // Prevent scrolling on touch
+    document.body.style.overscrollBehavior = 'none';
+    document.body.style.touchAction = 'none';
+}
+
+// ...existing code...
+
+function handleTouchStart(e: TouchEvent) {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (!touchIdToNode.has(t.identifier)) {
+            const color = getAvailableColor();
+            const node = new Node(String(t.identifier), color, t.clientX, t.clientY);
+            nodes.push(node);
+            touchIdToNode.set(t.identifier, node);
+        }
+    }
+}
+
+function handleTouchMove(e: TouchEvent) {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        const node = touchIdToNode.get(t.identifier);
+        if (node) {
+            node.x = t.clientX;
+            node.y = t.clientY;
+        }
+    }
+}
+
+function handleTouchEnd(e: TouchEvent) {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        const node = touchIdToNode.get(t.identifier);
+        if (node) {
+            const idx = nodes.indexOf(node);
+            if (idx !== -1) nodes.splice(idx, 1);
+            touchIdToNode.delete(t.identifier);
+        }
+    }
 }
 
 function step(timestamp: DOMHighResTimeStamp) {
@@ -55,3 +114,5 @@ function step(timestamp: DOMHighResTimeStamp) {
     
     requestAnimationFrame(step);
 }
+
+// ...existing code...

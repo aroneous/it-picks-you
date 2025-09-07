@@ -2,14 +2,14 @@ export function drawNode(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
+  radius: number,
   color: string,
   arcStart: number,
   arcEnd: number
 ): void {
-  const cm = 37.7952755906;
-  const nodeRadius = 0.75 * cm;
-  const arcInnerRadius = 1 * cm;
-  const arcOuterRadius = 1.25 * cm;
+  const nodeRadius = 0.6 * radius;
+  const arcInnerRadius = 0.8 * radius;
+  const arcOuterRadius = radius;
 
   // Draw the node (circle)
   ctx.beginPath();

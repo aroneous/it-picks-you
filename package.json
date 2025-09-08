@@ -2,7 +2,7 @@
   "name": "say-voo",
   "version": "1.0.0",
   "description": "A blatant rip-off of Chwazi",
-  "main": "main.ts",
+  "main": "src/client/index.ts",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",

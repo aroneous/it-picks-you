@@ -23,6 +23,7 @@ function startDecisionTimer() {
           nodes.splice(i, 1);
         }
       }
+      winnerNode.selectedTime = performance.now();
       decisionLocked = true;
     }
     decisionTimer = null;
@@ -37,7 +38,7 @@ function resetDecisionTimerIfNeeded() {
       clearTimeout(decisionTimer);
       decisionTimer = null;
     }
-    if (nodes.length < 2) {
+    if (touchIdToNode.size < 2) {
       decisionLocked = false;
       winnerNode = null;
     }

@@ -25,3 +25,18 @@ export function drawNode(
   ctx.fillStyle = color;
   ctx.fill();
 }
+
+export function drawHalo(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r1: number,
+  r2: number,
+  color: string) {
+    ctx.beginPath();
+    ctx.arc(x, y, r2, 0, 2 * Math.PI, false);
+    ctx.arc(x, y, r1, 0, 2 * Math.PI, true);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }

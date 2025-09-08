@@ -1,6 +1,7 @@
-import { drawNode } from "./draw";
+import { drawHalo, drawNode } from "./draw";
 
 const FILL_IN_TIME = 1000; // ms
+const HALO_EXPAND_TIME = 500; // ms
 const ROTATION_PERIOD = 1500; // ms
 const START_ARC_LENGTH = 0.25 * 2 * Math.PI; // radians
 const FILL_IN_ARC_LENGTH = 0.75 * 2 * Math.PI; // radians
@@ -21,6 +22,7 @@ export class Node implements NodeState {
   x: number;
   y: number;
   placedTime: DOMHighResTimeStamp;
+  selectedTime: DOMHighResTimeStamp | undefined = undefined;
 
   constructor(id: string, color: string, x: number, y: number) {
     this.id = id;
@@ -44,5 +46,17 @@ export class Node implements NodeState {
   
   draw(ctx: CanvasRenderingContext2D, radius: number): void {
     drawNode(ctx, this.x, this.y, radius, this.color, this.arcStart, this.arcEnd);
+
+    if (this.selectedTime) {
+      const elapsed = performance.now() - this.selectedTime;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const haloMinRadius = radius * 1.2;
+      const haloMaxRadius = Math.max(width, height);
+      const haloRadius = haloMinRadius + (haloMaxRadius - haloMinRadius) * Math.min(elapsed / HALO_EXPAND_TIME, 1);
+      ctx.save();
+      drawHalo(ctx, this.x, this.y, haloMinRadius, haloRadius, this.color);
+      ctx.restore();
+    }
   }
 }

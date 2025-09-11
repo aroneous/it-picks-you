@@ -18,7 +18,7 @@
     "vitest": "^3.2.4"
   },
   "devDependencies": {
-    "@vitejs/plugin-basic-ssl": "^2.1.0",
-    "vite-plugin-mkcert": "^1.17.8"
+    "vite-plugin-mkcert": "^1.17.8",
+    "vite-plugin-pwa": "^1.0.3"
   }
 }

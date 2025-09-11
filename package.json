@@ -16,5 +16,9 @@
     "typescript": "^5.9.2",
     "vite": "^7.1.4",
     "vitest": "^3.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.0",
+    "vite-plugin-mkcert": "^1.17.8"
   }
 }

@@ -1,8 +1,8 @@
 {
-  "name": "say-voo",
+  "name": "it-picks-you",
   "version": "1.0.0",
-  "description": "A blatant rip-off of Chwazi",
-  "main": "src/client/index.ts",
+  "description": "The fair start-player app",
+  "main": "src/index.ts",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",

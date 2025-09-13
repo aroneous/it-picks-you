@@ -5,6 +5,8 @@ const HALO_EXPAND_TIME = 500; // ms
 const ROTATION_PERIOD = 1500; // ms
 const START_ARC_LENGTH = 0.25 * 2 * Math.PI; // radians
 const FILL_IN_ARC_LENGTH = 0.75 * 2 * Math.PI; // radians
+const PULSE_PERIOD = 750; // ms
+const PULSE_MAGNITUDE = 0.05; // fraction of radius
 
 export interface NodeState {
   id: string;
@@ -12,8 +14,8 @@ export interface NodeState {
   x: number;
   y: number;
   placedTime: DOMHighResTimeStamp;
-  readonly arcStart: number;
-  readonly arcEnd: number;
+  getArcStart(elapsed: number): number;
+  getArcEnd(elapsed: number): number;
 }
 
 export class Node implements NodeState {
@@ -32,28 +34,32 @@ export class Node implements NodeState {
     this.placedTime = performance.now();
   }
   
-  get arcStart(): number {
-    const elapsed = performance.now() - this.placedTime;
+  getArcStart(elapsed: number): number {
     const rotation = (elapsed % ROTATION_PERIOD) / ROTATION_PERIOD;
     return rotation * (2 * Math.PI);
   }
   
-  get arcEnd(): number {
-    const elapsed = performance.now() - this.placedTime;
+  getArcEnd(elapsed: number): number {
     const fillProgress = Math.min(elapsed / FILL_IN_TIME, 1);
-    return this.arcStart + START_ARC_LENGTH + (FILL_IN_ARC_LENGTH * fillProgress);
+    return this.getArcStart(elapsed) + START_ARC_LENGTH + (FILL_IN_ARC_LENGTH * fillProgress);
   }
   
   draw(ctx: CanvasRenderingContext2D, radius: number): void {
-    drawNode(ctx, this.x, this.y, radius, this.color, this.arcStart, this.arcEnd);
+    const now = performance.now();
+    const elapsed = now - this.placedTime;
+    const pulseTime = (this.selectedTime || now) - this.placedTime;
+    const pulse = (Math.sin((2 * Math.PI * (pulseTime % PULSE_PERIOD)) / PULSE_PERIOD) + 1) / 2;
+    const actualRadius = radius * (1 + (PULSE_MAGNITUDE * pulse));
+
+    drawNode(ctx, this.x, this.y, actualRadius, this.color, this.getArcStart(elapsed), this.getArcEnd(elapsed));
 
     if (this.selectedTime) {
-      const elapsed = performance.now() - this.selectedTime;
+      const haloElapsed = performance.now() - this.selectedTime;
       const width = window.innerWidth;
       const height = window.innerHeight;
       const haloMinRadius = radius * 1.2;
       const haloMaxRadius = Math.max(width, height);
-      const haloRadius = haloMinRadius + (haloMaxRadius - haloMinRadius) * Math.min(elapsed / HALO_EXPAND_TIME, 1);
+      const haloRadius = haloMinRadius + (haloMaxRadius - haloMinRadius) * Math.min(haloElapsed / HALO_EXPAND_TIME, 1);
       ctx.save();
       drawHalo(ctx, this.x, this.y, haloMinRadius, haloRadius, this.color);
       ctx.restore();

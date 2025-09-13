@@ -1,4 +1,3 @@
-import { drawNode } from "./draw";
 import { Node } from "./state";
 
 const WAIT_DECISION_TIME = 2000; // ms

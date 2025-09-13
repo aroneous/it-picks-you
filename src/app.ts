@@ -74,17 +74,11 @@ function getAvailableColor(): string {
     return COLOR_LIST[Math.floor(Math.random() * COLOR_LIST.length)];
 }
 
-export function initializeApp() {
-    console.log('Client application initialized');
-    const h1 = document.createElement('h1');
-    h1.textContent = 'Initialized';
-    const canvas = document.createElement('canvas');
-    canvas.style.position = 'fixed';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100vw';
-    canvas.style.height = '100vh';
+let canvas: HTMLCanvasElement | null = null;
+let ctx: CanvasRenderingContext2D | null = null;
 
+function resizeCanvas() {
+    if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -92,29 +86,38 @@ export function initializeApp() {
     canvas.height = height * dpr;
     canvas.style.width = width + 'px';
     canvas.style.height = height + 'px';
-
-    // const cm = 37.7952755906;
-    const radius = Math.min(width, height) / 8;
-    document.body.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
     if (ctx) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
+}
 
+export function initializeApp() {
+    console.log('Client application initialized');
+    const h1 = document.createElement('h1');
+    h1.textContent = 'Initialized';
+    canvas = document.createElement('canvas');
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    document.body.appendChild(canvas);
+    ctx = canvas.getContext('2d');
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    if (ctx) {
+        ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+    }
     // Touch event handlers
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-
     requestAnimationFrame(step);
-
     // Prevent scrolling on touch
     document.body.style.overscrollBehavior = 'none';
     document.body.style.touchAction = 'none';
 }
-
-// ...existing code...
 
 function origHandleTouchStart(e: TouchEvent) {
     e.preventDefault();
@@ -172,5 +175,3 @@ function step(timestamp: DOMHighResTimeStamp) {
     
     requestAnimationFrame(step);
 }
-
-// ...existing code...

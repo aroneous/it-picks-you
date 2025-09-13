@@ -50,7 +50,7 @@ export default defineConfig({
             urlPattern: ({ request }) => request.destination === 'document' || request.destination === 'script' || request.destination === 'style' || request.destination === 'image' || request.destination === 'font',
             handler: 'CacheFirst',
             options: {
-              cacheName: 'itchoosesyou-assets-cache',
+              cacheName: 'itpicksyou-assets-cache',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 90 // 90 Days

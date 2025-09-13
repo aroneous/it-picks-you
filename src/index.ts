@@ -1,5 +1,6 @@
 // Entrypoint for the client application
 import { initializeApp } from './app';
+import { playScale } from './audio';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Detect touch support
@@ -32,4 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initializeApp();
+
+    // playScale(250);
 });

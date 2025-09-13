@@ -1,3 +1,4 @@
+import { playScaleTone } from "./audio";
 import { Node } from "./state";
 
 const WAIT_DECISION_TIME = 2000; // ms
@@ -122,8 +123,10 @@ function origHandleTouchStart(e: TouchEvent) {
         if (!touchIdToNode.has(t.identifier)) {
             const color = getAvailableColor();
             const node = new Node(String(t.identifier), color, t.clientX, t.clientY);
+            const toneIndex = nodes.length; // or some other logic
             nodes.push(node);
             touchIdToNode.set(t.identifier, node);
+            playScaleTone(toneIndex, 300);
         }
     }
 }

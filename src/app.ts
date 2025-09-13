@@ -37,7 +37,7 @@ function resetDecisionTimerIfNeeded() {
       clearTimeout(decisionTimer);
       decisionTimer = null;
     }
-    if (touchIdToNode.size < 2) {
+    if (touchIdToNode.size < 1) {
       decisionLocked = false;
       winnerNode = null;
     }

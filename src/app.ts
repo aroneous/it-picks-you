@@ -121,14 +121,26 @@ export function initializeApp() {
     document.body.style.touchAction = 'none';
 }
 
+const MAX_TONES = 10; // or set to the number of tones you support
+const assignedTones: Map<number, number> = new Map(); // touchId -> toneIndex
+
+function getAvailableToneIndex(): number {
+    const used = new Set(assignedTones.values());
+    for (let i = 0; i < MAX_TONES; i++) {
+        if (!used.has(i)) return i;
+    }
+    return 0; // fallback, should not happen if MAX_TONES >= max touches
+}
+
 function origHandleTouchStart(e: TouchEvent) {
     e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
         if (!touchIdToNode.has(t.identifier)) {
             const color = getAvailableColor();
+            const toneIndex = getAvailableToneIndex();
+            assignedTones.set(t.identifier, toneIndex);
             const node = new Node(String(t.identifier), color, t.clientX, t.clientY);
-            const toneIndex = nodes.length; // or some other logic
             nodes.push(node);
             touchIdToNode.set(t.identifier, node);
             playScaleTone(toneIndex, TONE_DURATION);
@@ -158,6 +170,7 @@ function origHandleTouchEnd(e: TouchEvent) {
             if (idx !== -1) nodes.splice(idx, 1);
             touchIdToNode.delete(t.identifier);
         }
+        assignedTones.delete(t.identifier);
     }
 }
 

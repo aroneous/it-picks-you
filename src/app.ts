@@ -4,6 +4,7 @@ import { Node } from "./state";
 const WAIT_DECISION_TIME = 2000; // ms
 const TONE_DURATION = 600; // ms
 const SELECTED_TONE_DURATION = 1200; // ms
+const REMOVE_TOUCH_DURATION = 100; // ms
 
 let decisionTimer: number | null = null;
 let decisionLocked = false;
@@ -171,6 +172,7 @@ function origHandleTouchEnd(e: TouchEvent) {
             const idx = nodes.indexOf(node);
             if (idx !== -1) nodes.splice(idx, 1);
             touchIdToNode.delete(t.identifier);
+            if (!decisionLocked) playScaleSelectedTone(assignedTones.get(t.identifier) || 0, REMOVE_TOUCH_DURATION);
         }
         assignedTones.delete(t.identifier);
     }

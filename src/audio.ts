@@ -16,12 +16,12 @@ export function playTone(frequency: number, duration: number): void {
   oscillator.type = 'triangle';
   oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
   
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(25, audioCtx.currentTime); // Cutoff frequency
-  filter.frequency.exponentialRampToValueAtTime(frequency, audioCtx.currentTime + duration / 1000); // Sweep up
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(frequency, audioCtx.currentTime); // Cutoff frequency
+  // filter.frequency.exponentialRampToValueAtTime(frequency, audioCtx.currentTime + duration / 1000); // Sweep up
   // filter.frequency.linearRampToValueAtTime(frequency, audioCtx.currentTime + duration / 1000); // Sweep up
-  filter.Q.setValueAtTime(5, audioCtx.currentTime); // Resonance
-  // filter.Q.linearRampToValueAtTime(0.5, audioCtx.currentTime + duration / 1000); // Decrease resonance
+  filter.Q.setValueAtTime(25, audioCtx.currentTime); // Resonance
+  filter.Q.linearRampToValueAtTime(1, audioCtx.currentTime + duration / 1000); // Decrease resonance
 
   gainNode.gain.setValueAtTime(0, audioCtx.currentTime); // Lower volume
 

@@ -13,17 +13,20 @@ export function playTone(frequency: number, duration: number): void {
   const filter = audioCtx.createBiquadFilter();
   const gainNode = audioCtx.createGain();
 
-  oscillator.type = 'sawtooth';
+  oscillator.type = 'triangle';
   oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
   
   filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(75, audioCtx.currentTime); // Cutoff frequency
-  filter.Q.setValueAtTime(3, audioCtx.currentTime); // Resonance
+  filter.frequency.setValueAtTime(25, audioCtx.currentTime); // Cutoff frequency
+  filter.frequency.exponentialRampToValueAtTime(frequency, audioCtx.currentTime + duration / 1000); // Sweep up
+  // filter.frequency.linearRampToValueAtTime(frequency, audioCtx.currentTime + duration / 1000); // Sweep up
+  filter.Q.setValueAtTime(5, audioCtx.currentTime); // Resonance
+  // filter.Q.linearRampToValueAtTime(0.5, audioCtx.currentTime + duration / 1000); // Decrease resonance
 
-  gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // Lower volume
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime); // Lower volume
 
-  const attack = duration * 0.66 / 1000; // seconds
-  const decay = duration * 0.33 / 1000; // seconds
+  const attack = duration * 0.25 / 1000; // seconds
+  const decay = duration * 0.75 / 1000; // seconds
   const sustain = 0.0; // volume level (0 to 1)
   // const release = 0.2; // seconds
   // Attack
@@ -41,7 +44,7 @@ export function playTone(frequency: number, duration: number): void {
   gainNode.connect(audioCtx.destination);
 
   oscillator.start();
-  oscillator.stop(audioCtx.currentTime + duration / 1000 + 0.1); // slight buffer to ensure it stops after gain envelope
+  oscillator.stop(audioCtx.currentTime + duration / 1000 + 0.2); // slight buffer to ensure it stops after gain envelope
 
   oscillator.onended = () => {
     audioCtx.close();

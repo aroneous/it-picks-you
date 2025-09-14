@@ -2,6 +2,8 @@ import { playScaleTone } from "./audio";
 import { Node } from "./state";
 
 const WAIT_DECISION_TIME = 2000; // ms
+const TONE_DURATION = 600; // ms
+
 let decisionTimer: number | null = null;
 let decisionLocked = false;
 let winnerNode: Node | null = null;
@@ -129,7 +131,7 @@ function origHandleTouchStart(e: TouchEvent) {
             const toneIndex = nodes.length; // or some other logic
             nodes.push(node);
             touchIdToNode.set(t.identifier, node);
-            playScaleTone(toneIndex, 300);
+            playScaleTone(toneIndex, TONE_DURATION);
         }
     }
 }

@@ -1,8 +1,9 @@
-import { playScaleTone } from "./audio";
+import { playScaleSelectedTone, playScaleTone } from "./audio";
 import { Node } from "./state";
 
 const WAIT_DECISION_TIME = 2000; // ms
 const TONE_DURATION = 600; // ms
+const SELECTED_TONE_DURATION = 1200; // ms
 
 let decisionTimer: number | null = null;
 let decisionLocked = false;
@@ -26,6 +27,7 @@ function startDecisionTimer() {
         }
       }
       winnerNode.selectedTime = performance.now();
+      playScaleSelectedTone(assignedTones.get(winnerIdx) || 0, SELECTED_TONE_DURATION);
       decisionLocked = true;
     }
     decisionTimer = null;

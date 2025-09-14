@@ -51,11 +51,19 @@ export function playTone(frequency: number, duration: number): void {
   };
 }
 
-export function playScaleTone(nodeIndex: number, duration: number): void {
+function playScaledTone(nodeIndex: number, duration: number, cb: (frequency: number, duration: number) => void): void {
   const scaleIndex = ((nodeIndex % SCALE_SEMITONES.length) + SCALE_SEMITONES.length) % SCALE_SEMITONES.length;
   const semitoneOffset = SCALE_SEMITONES[scaleIndex];
   const frequency = frequencyForNodeIndex(semitoneOffset);
-  playTone(frequency, duration);
+  cb(frequency, duration);
+}
+
+export function playScaleTone(nodeIndex: number, duration: number): void {
+  playScaledTone(nodeIndex, duration, playTone);
+}
+
+export function playScaleSelectedTone(nodeIndex: number, duration: number): void {
+  playScaledTone(nodeIndex, duration, playSelectedTone);
 }
 
 export function playScale(duration: number): void {
@@ -65,4 +73,41 @@ export function playScale(duration: number): void {
       playTone(frequency, duration);
     }, i * (duration + 100));
   });
+}
+
+export function playSelectedTone(frequency: number, duration: number): void {
+  console.log(`Playing selected tone: ${frequency} Hz for ${duration} ms (band-pass)`);
+  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  const filter = audioCtx.createBiquadFilter();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.type = 'triangle';
+  oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(frequency, audioCtx.currentTime); // Centered on frequency
+  // Start with a wide Q (low resonance, wide band)
+  filter.Q.setValueAtTime(1, audioCtx.currentTime);
+  // Ramp Q up to narrow the band over the duration
+  filter.Q.linearRampToValueAtTime(25, audioCtx.currentTime + duration / 1000);
+
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  const attack = duration * 0.25 / 1000;
+  const decay = duration * 0.75 / 1000;
+  const sustain = 0.0;
+  gainNode.gain.cancelAndHoldAtTime(audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(0.7, audioCtx.currentTime + attack);
+  gainNode.gain.linearRampToValueAtTime(sustain, audioCtx.currentTime + attack + decay);
+
+  oscillator.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.start();
+  oscillator.stop(audioCtx.currentTime + duration / 1000 + 0.2);
+
+  oscillator.onended = () => {
+    audioCtx.close();
+  };
 }

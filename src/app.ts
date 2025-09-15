@@ -98,8 +98,6 @@ function resizeCanvas() {
 
 export function initializeApp() {
     console.log('Client application initialized');
-    const h1 = document.createElement('h1');
-    h1.textContent = 'Initialized';
     canvas = document.createElement('canvas');
     canvas.style.position = 'fixed';
     canvas.style.top = '0';
@@ -123,6 +121,52 @@ export function initializeApp() {
     // Prevent scrolling on touch
     document.body.style.overscrollBehavior = 'none';
     document.body.style.touchAction = 'none';
+
+    // --- Info Button and Overlay ---
+    const infoBtn = document.createElement('button');
+    infoBtn.className = 'info-btn';
+    infoBtn.setAttribute('aria-label', 'Show info');
+    infoBtn.innerHTML = `
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="14" cy="14" r="13" stroke="#bbb" stroke-width="2" fill="none"/>
+        <rect x="13" y="11" width="2" height="8" rx="1" fill="#bbb"/>
+        <rect x="13" y="7" width="2" height="2" rx="1" fill="#bbb"/>
+      </svg>
+    `;
+    document.body.appendChild(infoBtn);
+
+    const infoOverlay = document.createElement('div');
+    infoOverlay.className = 'info-overlay';
+    infoOverlay.innerHTML = `
+      <div class="info-bubble">
+        <a class="info-github-link" href="https://github.com/aroneous/it-picks-you" target="_blank" rel="noopener" aria-label="GitHub repository">
+          <img src="github-mark-white.svg" alt="GitHub" width="28" height="28" />
+        </a>
+        <div class="info-bubble-arrow"></div>
+        <div class="info-bubble-content">
+          <h2>What is this?</h2>
+          <p>The eternal question: who will go first in the game? This provides the answer!
+          All players lay a finger on the screen, and wait a couple of seconds. Your fate will
+          be determined.</p>
+
+          <h2>Isn't this just Chwazi but less full-featured?</h2>
+          <p>...yes, but Chwazi went away, so now you have this.</p>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(infoOverlay);
+    infoOverlay.style.display = 'none';
+
+    infoBtn.addEventListener('click', () => {
+      infoOverlay.style.display = 'flex';
+      setTimeout(() => infoOverlay.classList.add('open'), 10);
+    });
+    infoOverlay.addEventListener('click', (e) => {
+      if (e.target === infoOverlay) {
+        infoOverlay.classList.remove('open');
+        setTimeout(() => (infoOverlay.style.display = 'none'), 200);
+      }
+    });
 }
 
 const MAX_TONES = 10; // or set to the number of tones you support

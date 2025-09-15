@@ -1,0 +1,115 @@
+.info-github-link {
+	position: absolute;
+	top: 14px;
+	right: 18px;
+	z-index: 2;
+	opacity: 0.85;
+	transition: opacity 0.15s;
+}
+.info-github-link:hover {
+	opacity: 1;
+}
+.info-github-link img {
+	display: block;
+	width: 28px;
+	height: 28px;
+}
+
+/* Floating Info Button */
+.info-btn {
+	position: fixed;
+	bottom: 24px;
+	right: 24px;
+	width: 48px;
+	height: 48px;
+	border: none;
+	border-radius: 50%;
+	background: rgba(30,31,37,0.1);
+	box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	z-index: 10001;
+	transition: background 0.2s;
+	padding: 0;
+}
+.info-btn:hover {
+	background: rgba(30,31,37,0.18);
+}
+.info-btn svg {
+	display: block;
+}
+
+/* Overlay and Speech Bubble */
+.info-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(30,31,37,0.18);
+	display: flex;
+	align-items: flex-end;
+	justify-content: flex-end;
+	z-index: 10000;
+	transition: background 0.2s;
+}
+.info-overlay.open {
+	background: rgba(30,31,37,0.32);
+}
+.info-bubble {
+	position: relative;
+	margin: 0 32px 80px 0;
+	background: #23242a;
+	color: #eee;
+	border-radius: 18px;
+	min-width: 260px;
+	max-width: 90vw;
+	box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+	padding: 24px 28px 20px 28px;
+	opacity: 0;
+	transform: scale(0.7) translateY(40px);
+	transition: opacity 0.18s cubic-bezier(.4,1.4,.6,1), transform 0.18s cubic-bezier(.4,1.4,.6,1);
+	pointer-events: auto;
+}
+.info-overlay.open .info-bubble {
+	opacity: 1;
+	transform: scale(1) translateY(0);
+}
+.info-bubble-arrow {
+	position: absolute;
+	right: 24px;
+	bottom: -18px;
+	width: 32px;
+	height: 18px;
+	overflow: hidden;
+}
+.info-bubble-arrow::after {
+	content: '';
+	display: block;
+	width: 32px;
+	height: 32px;
+	background: #23242a;
+	border-radius: 50%;
+	position: absolute;
+	left: 0;
+	top: -16px;
+	box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.info-bubble-content {
+	font-family: system-ui, sans-serif;
+	font-size: 1rem;
+	line-height: 1.5;
+}
+
+.info-bubble-content h2:first-child {
+  margin-top: 0;
+}
+
+.info-bubble-content h2 {
+	font-size: 1.2rem;
+	color: #bbb;
+	font-weight: 600;
+}
+.info-bubble-content p {
+	margin-bottom: 0;
+	color: #ccc;
+}

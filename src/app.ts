@@ -106,6 +106,7 @@ export function initializeApp() {
     canvas.style.left = '0';
     canvas.style.width = '100vw';
     canvas.style.height = '100vh';
+    canvas.style.background = 'linear-gradient(#1e1f25 0%, #16161a 100%)';
     document.body.appendChild(canvas);
     ctx = canvas.getContext('2d');
     resizeCanvas();

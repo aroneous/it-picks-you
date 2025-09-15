@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
         msg.style.display = 'flex';
         msg.style.alignItems = 'center';
         msg.style.justifyContent = 'center';
-        msg.style.background = 'black';
         msg.style.color = '#aaa';
         msg.style.fontFamily = 'sans-serif';
         msg.style.fontSize = '2rem';
@@ -33,6 +32,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initializeApp();
-
-    // playScale(250);
 });

@@ -18,8 +18,8 @@ export default defineConfig({
         name: 'It Always Picks You',
         short_name: 'It Picks You',
         description: 'The fair start-player app',
-        theme_color: '#000000',
-        background_color: '#000000',
+        theme_color: '#1e1f25',
+        background_color: '#1e1f25',
         display: 'standalone',
         start_url: 'index.html',
         icons: [

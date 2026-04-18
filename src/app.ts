@@ -1,4 +1,4 @@
-import { playScaleSelectedTone, playScaleTone } from "./audio";
+import { playScaleSelectedTone, playScaleTone, resumeAudioContext } from "./audio";
 import { Node } from "./state";
 
 const WAIT_DECISION_TIME = 2000; // ms
@@ -51,6 +51,7 @@ function resetDecisionTimerIfNeeded() {
 }
 
 function handleTouchStart(e: TouchEvent) {
+  resumeAudioContext();
   if (decisionLocked) return;
   origHandleTouchStart(e);
   resetDecisionTimerIfNeeded();

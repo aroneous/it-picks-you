@@ -1,12 +1,12 @@
-//import { resolve } from 'path';
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import mkcert from'vite-plugin-mkcert';
+import mkcert from 'vite-plugin-mkcert';
 
-export default defineConfig({
-  //root: resolve(__dirname, 'public'),
+export default defineConfig(({ command }) => ({
   plugins: [
-    mkcert(),
+    // Local HTTPS certificate for the dev server only; not needed (or wanted in CI) for builds.
+    ...(command === 'serve' ? [mkcert()] : []),
     VitePWA({
       registerType: 'autoUpdate',
       strategies: 'generateSW',
@@ -61,7 +61,7 @@ export default defineConfig({
       }
     })
   ],
-  // server: {
-  //   https: true // Enable HTTPS
-  // }
-});
+  test: {
+    include: ['src/**/*.test.ts'],
+  },
+}));

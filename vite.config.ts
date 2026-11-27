@@ -3,10 +3,11 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import mkcert from 'vite-plugin-mkcert';
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, isPreview }) => ({
   plugins: [
-    // Local HTTPS certificate for the dev server only; not needed (or wanted in CI) for builds.
-    ...(command === 'serve' ? [mkcert()] : []),
+    // Local HTTPS certificate for the dev server only. Builds and `vite preview` (used by the
+    // E2E tests) don't need it, and in CI it would try to download mkcert.
+    ...(command === 'serve' && !isPreview ? [mkcert()] : []),
     VitePWA({
       registerType: 'autoUpdate',
       strategies: 'generateSW',

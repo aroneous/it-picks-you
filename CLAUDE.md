@@ -6,11 +6,12 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 
 - TypeScript (strict) + Vite 7 + `vite-plugin-pwa` (Workbox `generateSW`). There's no UI framework: everything is drawn on a full-screen `<canvas>`, and the info button and overlay are added with plain DOM calls.
 - Node version: `.nvmrc` (24). CI uses the same version.
-- `npm run dev`: dev server on `0.0.0.0` over HTTPS (`vite-plugin-mkcert` makes a local cert, in serve mode only). You need HTTPS to open the dev server from a phone on the LAN, because service workers and some audio features only work in a secure context. The service worker is also turned on in dev (`devOptions.enabled`). Its output goes to `dev-dist/`, which is gitignored.
+- `npm run dev`: dev server on `0.0.0.0` over HTTPS (`vite-plugin-mkcert` makes a local cert, for the dev server only; `vite preview` and builds don't use it). You need HTTPS to open the dev server from a phone on the LAN, because service workers and some audio features only work in a secure context. The service worker is also turned on in dev (`devOptions.enabled`). Its output goes to `dev-dist/`, which is gitignored.
 - `npm run build`: runs `tsc` (type-check only; `noEmit` is set), then `vite build`, and writes to `dist/`.
 - `npm run preview`: serves `dist/` locally.
 - `npm run typecheck`: `tsc` on its own. Test files are type-checked too.
 - `npm test`: runs the Vitest suite once. `npm run test:watch` runs it in watch mode.
+- `npm run test:e2e`: builds, then runs the Playwright E2E tests against `vite preview`. Run `npx playwright install chromium` once first. After a build, `npx playwright test` skips rebuilding.
 
 ## Source layout (`src/`)
 
@@ -42,21 +43,26 @@ Timing constants: `WAIT_DECISION_TIME` in `round.ts`, tone durations in `app.ts`
 
 - The PWA has `registerType: 'autoUpdate'`, so a new deploy takes over on the next load after the service worker sees the new `sw.js`. The extra `CacheFirst` runtime cache for documents and scripts is mostly redundant with precaching, and for anything not precached it could keep stale copies for up to 90 days.
 - `npm audit` reports advisories in build-time dev dependencies (Babel via Workbox, and Vitest 3). None of them reach the shipped bundle. Upgrading to Vitest 4 is the main fix.
-- The touch-handling glue in `app.ts` has no automated tests. Only `round.ts`, `state.ts` and the audio maths do. Changes to `app.ts` need checking on a real touch device, or with the planned E2E tests.
+- The E2E tests run only in Chromium. Safari on iOS is the most likely place for touch or audio differences, so check changes to `app.ts` or `audio.ts` on an iPhone or iPad too.
 
 ## Testing
 
-Vitest runs in the Node environment, with no DOM. Tests live next to the code as `src/*.test.ts`.
+**Unit tests (Vitest)** run in the Node environment, with no DOM. They live next to the code as `src/*.test.ts`.
 
 - `round.test.ts` covers the game rules with fake timers and an injected `random`/`now`. Add a test here for any change to the rules.
 - `state.test.ts` covers the arc and fill maths. `audio.test.ts` covers the frequency maths.
 - Keep new game logic in pure modules like `round.ts` rather than `app.ts`, so it can be tested without a browser.
 
-Planned: Playwright E2E tests. Chromium with touch emulation can send multi-touch through CDP (`Input.dispatchTouchEvent`). That would cover the `app.ts` glue and check that the built `dist/` serves the service worker and manifest.
+**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the info overlay, and the manifest and service worker.
+
+- Multi-touch: `e2e/touch.ts` has a `Fingers` helper built on CDP `Input.dispatchTouchEvent`, because Playwright's `touchscreen` only taps. `touchStart` sends every finger that's down; `touchEnd` lists the fingers being lifted. Don't release fingers by sending a `touchMove` without them: Chromium holds that touchend back until the next input event.
+- Assertions read canvas pixels with `alphaAt(x, y)`: alpha 0 means nothing is drawn there. The background is a CSS gradient, not drawn on the canvas. A ring is opaque at its finger's position, and after a pick the winner's halo fills the screen, so a corner pixel becomes opaque.
+- To fix the winner, use `page.addInitScript(() => (Math.random = () => 0))` and then reload. `Round` keeps its own reference to `Math.random` when it's created, so overriding it after the page loads has no effect.
+- Wait for state changes with `expect.poll(...)`, not fixed timeouts, except when checking that something *doesn't* happen.
 
 ## CI/CD
 
-`.github/workflows/ci.yml` runs on every push to `main` and on every pull request: `npm ci`, `npm test`, `npm run build`, then a deploy to Cloudflare Pages with `wrangler pages deploy dist`.
+`.github/workflows/ci.yml` runs on every push to `main` and on every pull request: `npm ci`, `npm test`, `npm run build`, then the Playwright E2E tests. If those fail, it uploads the traces as an artifact (open them with `npx playwright show-trace`). Finally it deploys to Cloudflare Pages with `wrangler pages deploy dist`. Nothing deploys unless every test passes.
 
 - A push to `main` deploys to production. The Pages project's production branch must be `main`.
 - A pull request from a branch in this repo deploys a preview, and its URL appears in the run summary. Pull requests from forks are built and tested but never deployed, because they can't see the secrets.

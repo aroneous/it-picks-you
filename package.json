@@ -9,12 +9,15 @@
     "preview": "vite preview",
     "typecheck": "tsc",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "npm run build && playwright test"
   },
   "author": "Aroneous",
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^24.19.4",
     "typescript": "^5.9.2",
     "vite": "^7.1.4",
     "vite-plugin-mkcert": "^1.17.8",

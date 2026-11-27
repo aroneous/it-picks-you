@@ -31,7 +31,7 @@ test.describe('mode selector', () => {
 
     await count.click();
     await page.locator('.mode-knob').click();
-    await expect(capsule(page)).toHaveText(/Split\s*3\s*teams/);
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
 
     await page.locator('.mode-knob').click();
     await expect(capsule(page)).toHaveText(/Rank\s*all players/);
@@ -46,9 +46,29 @@ test.describe('mode selector', () => {
   test('remembers the mode across reloads', async ({ page }) => {
     await page.goto('/');
     await page.locator('.mode-knob').click();
-    await expect(capsule(page)).toHaveText(/Split\s*2\s*teams/);
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
     await page.reload();
-    await expect(capsule(page)).toHaveText(/Split\s*2\s*teams/);
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
+  });
+
+  test('Choose and Split keep their own numbers', async ({ page }) => {
+    await page.goto('/');
+    const knob = page.locator('.mode-knob');
+    const count = capsule(page).locator('.mode-count');
+    await count.click();
+    await count.click();
+    await expect(capsule(page)).toHaveText(/Choose\s*3\s*players/);
+    await knob.click();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
+    await count.click();
+    await count.click();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*4\s*teams/);
+    await knob.click();
+    await knob.click();
+    await expect(capsule(page)).toHaveText(/Choose\s*3\s*players/);
+    await page.reload();
+    await knob.click();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*4\s*teams/);
   });
 
   test('hides while fingers are on the screen', async ({ page }) => {

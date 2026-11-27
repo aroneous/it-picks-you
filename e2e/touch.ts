@@ -77,7 +77,8 @@ export async function rgbaAt(page: Page, x: number, y: number): Promise<[number,
 /**
  * Sets up the page before the app loads: `Math.random` always returning 0 (so the first
  * finger wins, colors are assigned in COLOR_LIST order, and teams are dealt in turn),
- * and optionally a stored mode. Call before `page.goto`/`page.reload`.
+ * and optionally a stored mode. The mode is stored in the older `{ kind, count }` format,
+ * which the app still reads (as that mode's number). Call before `page.goto`/`page.reload`.
  */
 export async function deterministic(page: Page, mode?: { kind: 'players' | 'teams' | 'rank'; count: number }): Promise<void> {
   await page.addInitScript(m => {

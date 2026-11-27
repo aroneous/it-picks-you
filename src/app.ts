@@ -1,5 +1,6 @@
 import { playScaleSelectedTone, playScaleTone, resumeAudioContext } from "./audio";
-import { createModeSelector, loadMode, ModeSelector } from "./modeSelector";
+import { modeOf } from "./mode";
+import { createModeSelector, loadSettings, ModeSelector } from "./modeSelector";
 import { drawRegions } from "./regions";
 import { PICK_STAGGER, PickResult, Round } from "./round";
 import { showSplash } from "./splash";
@@ -10,11 +11,13 @@ const REMOVE_TOUCH_DURATION = 100; // ms
 /** The single note played when teams are picked (A440 in the scale). */
 const TEAMS_PICK_TONE = 5;
 
+const modeSettings = loadSettings();
+
 const round = new Round({
     onPlace: node => playScaleTone(node.toneIndex, TONE_DURATION),
     onLift: node => playScaleSelectedTone(node.toneIndex, REMOVE_TOUCH_DURATION),
     onPick: playPickSound,
-    mode: loadMode(),
+    mode: modeOf(modeSettings),
 });
 
 /**
@@ -113,7 +116,7 @@ export function initializeApp() {
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-    selector = createModeSelector(round.mode, mode => round.setMode(mode));
+    selector = createModeSelector(modeSettings, mode => round.setMode(mode));
     requestAnimationFrame(step);
     // Prevent scrolling on touch
     document.body.style.overscrollBehavior = 'none';

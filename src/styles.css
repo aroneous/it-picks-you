@@ -211,6 +211,9 @@
 	color: #eee;
 	font-weight: 600;
 }
+.mode-capsule .mode-joiner {
+	margin-left: -2px;
+}
 .mode-capsule .mode-count {
 	min-width: 36px;
 	height: 34px;

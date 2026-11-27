@@ -81,9 +81,9 @@ Timing constants: `WAIT_DECISION_TIME` and `PICK_STAGGER` in `round.ts`, tone du
 `.github/workflows/ci.yml` runs on every push to `main` and on every pull request: `npm ci`, `npm test`, `npm run build`, then the Playwright E2E tests. If those fail, it uploads the traces as an artifact (open them with `npx playwright show-trace`). Finally it deploys to Cloudflare Pages with `wrangler pages deploy dist`. Nothing deploys unless every test passes.
 
 - A push to `main` deploys to production. The Pages project's production branch must be `main`.
-- A pull request from a branch in this repo deploys a preview, and its URL appears in the run summary. Pull requests from forks are built and tested but never deployed, because they can't see the secrets.
+- A pull request from a branch in this repo deploys a preview, and its URL appears in the run summary. Pull requests from forks and from Dependabot are built and tested but never deployed, because they can't see the secrets.
 - The deploy step is skipped until the repository **variable** `CLOUDFLARE_PAGES_PROJECT` is set. It also needs the repository **secrets** `CLOUDFLARE_API_TOKEN` (permission: Account → Cloudflare Pages → Edit) and `CLOUDFLARE_ACCOUNT_ID`.
-- Dependabot (`.github/dependabot.yml`) opens weekly PRs: one grouped PR for npm minor and patch updates, separate PRs for npm majors, and one for GitHub Actions. It ignores major updates to `@types/node`, which tracks the Node major in `.nvmrc`; bump both together by hand. CI runs every Dependabot PR through the full test suite and deploys a preview.
+- Dependabot (`.github/dependabot.yml`) opens weekly PRs: one grouped PR for npm minor and patch updates, separate PRs for npm majors, and one for GitHub Actions. It ignores major updates to `@types/node`, which tracks the Node major in `.nvmrc`; bump both together by hand. CI runs every Dependabot PR through the full test suite but doesn't deploy a preview: GitHub doesn't give Dependabot runs the repository's Actions secrets, and keeping the deploy token away from freshly updated packages is safer anyway.
 - Cloudflare's own Git integration is not used. GitHub Actions builds the site and uploads it ("Direct Upload"), so deploys don't count against the free plan's monthly build limit.
 
 ## Deployment

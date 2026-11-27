@@ -1,6 +1,6 @@
 # It Always Picks You: developer notes
 
-A start-player picker. Everyone puts a finger on the screen and after a short wait one of them is chosen at random. A selector at the top can change this to several players, splitting everyone into teams, or ranking everyone. It copies the behaviour of the retired app Chwazi. It's a static, client-only PWA with no backend. In production it's served from https://itpicksyou.wily.cc/ on Cloudflare Pages (see Deployment).
+A start-player picker. Everyone puts a finger on the screen and after a short wait one of them is chosen at random. A selector at the top can change this to several players, splitting everyone into teams, or ranking everyone. It's modelled on the app Chwazi. It's a static, client-only PWA with no backend. In production it's served from https://itpicksyou.wily.cc/ on Cloudflare Pages (see Deployment).
 
 ## Stack and commands
 

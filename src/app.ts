@@ -151,9 +151,6 @@ export function initializeApp() {
           <p>Turn the knob at the top to change what it does: <strong>Choose</strong> one or
           more players, <strong>Split</strong> everyone into teams, or <strong>Rank</strong>
           everyone in order. Tap the number to change it.</p>
-
-          <h2>Isn't this just Chwazi?</h2>
-          <p>...yes, but Chwazi went away, so now you have this.</p>
           <p><button type="button" class="info-about">About &amp; install</button></p>
         </div>
       </div>

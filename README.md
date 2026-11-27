@@ -1,7 +1,7 @@
 # It Always Picks You!
 
 ## Overview
-~~A rip-off of~~ _An homage to_ the seemingly-abandoned start-player-choosing app Chwazi, packaged as a Progressive Web App. Available for use at [https://itpicksyou.wily.cc/](https://itpicksyou.wily.cc).
+~~A rip-off of~~ _An homage to_ the start-player-choosing app Chwazi, packaged as a Progressive Web App. Available for use at [https://itpicksyou.wily.cc/](https://itpicksyou.wily.cc).
 
 The name? There are inevitably accusations of cheating by some sore loser of the start-player-choosing lottery. This app is just as rigged as all the rest!
 

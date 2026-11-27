@@ -153,13 +153,58 @@ test('rank: every finger stays in its color and is ranked in turn from first pla
   expect(await rgbaAt(page, C.x, C.y)).toEqual(GREEN);
   expect(await alphaAt(page, CORNER.x, CORNER.y)).toBe(0);
 
-  // The chips stay up for RANK_LINGER_TIME (1 s) after the last finger lifts.
+  // The chips stay up after everyone lifts, with Done and Start draft offered.
+  const actions = page.locator('.rank-actions');
+  await expect(actions).toHaveClass(/hidden/);
   await fingers.liftAll();
-  await nextFrames(page);
+  await expect(actions).not.toHaveClass(/hidden/);
+  await page.waitForTimeout(1500);
   expect(await rgbaAt(page, A.x, A.y)).toEqual(RED);
   await expect(page.locator('.mode-selector')).toHaveClass(/hidden/);
-  await expect.poll(() => alphaAt(page, A.x, A.y), { timeout: 3000 }).toBe(0);
+
+  // Done fades the chips out and goes back to idle.
+  await actions.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(actions).toHaveClass(/hidden/);
+  await expect.poll(() => alphaAt(page, A.x, A.y), { timeout: 2000 }).toBe(0);
   await expect(page.locator('.mode-selector')).not.toHaveClass(/hidden/);
+});
+
+test('draft: picks follow the fair-share order, building a history', async ({ page }) => {
+  await deterministic(page, { kind: 'rank', count: 1 });
+  await page.goto('/');
+  const fingers = await Fingers.attach(page);
+  await fingers.place(A, B, C);
+  await expect.poll(() => alphaAt(page, C.x + 35, C.y), { timeout: PICK_TIMEOUT }).toBe(255);
+  await fingers.liftAll();
+  await page.locator('.rank-actions').getByRole('button', { name: 'Start draft' }).click();
+
+  const draft = page.locator('.draft');
+  const card = draft.locator('.draft-card');
+  const chips = draft.locator('.draft-chip');
+  await expect(draft).toBeVisible();
+  await expect(card).toHaveCSS('background-color', 'rgb(255, 0, 0)'); // first place: A, red
+  await expect(card.locator('.draft-card-number')).toHaveText('1');
+  await expect(chips).toHaveCount(0);
+
+  // With three players the order starts 1 2 3 3 2 1. Next and tapping the card both advance.
+  await draft.getByRole('button', { name: 'Next', exact: true }).click();
+  await card.click();
+  await draft.getByRole('button', { name: 'Next', exact: true }).click();
+  await draft.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(chips).toHaveText(['1', '2', '3', '3']);
+  await expect(card.locator('.draft-card-number')).toHaveText('2');
+  await expect(card).toHaveCSS('background-color', 'rgb(0, 0, 255)'); // B, blue
+  await expect(chips.nth(1)).toHaveCSS('background-color', 'rgb(0, 0, 255)'); // B, blue
+  // Each chip lands in place once its flight finishes.
+  await expect(draft.locator('.draft-flyer')).toHaveCount(0);
+  await expect(chips.last()).toBeVisible();
+
+  // The mode selector stays hidden under the draft; Done closes it and returns to idle.
+  await expect(page.locator('.mode-selector')).toHaveClass(/hidden/);
+  await draft.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(draft).toHaveCount(0);
+  await expect(page.locator('.mode-selector')).not.toHaveClass(/hidden/);
+  expect(await alphaAt(page, A.x, A.y)).toBe(0);
 });
 
 test('the knob stays put when the mode changes', async ({ page }) => {

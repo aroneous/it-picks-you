@@ -34,12 +34,7 @@ export const TEAM_COLORS = ['red', 'blue', 'yellow', 'lime', 'magenta'];
 
 export const MAX_TONES = 10;
 
-/**
- * After a rank, how long the chips stay on screen once every finger has lifted. Fingers
- * cover the numbers, so people lift them to read the result.
- */
-export const RANK_LINGER_TIME = 1000; // ms
-/** After the linger, the chips fade out over this long, then the round unlocks. */
+/** After a rank is finished (`finishRank`), the chips fade out over this long, then the round unlocks. */
 export const RANK_FADE_TIME = 250; // ms
 
 export interface RoundOptions {
@@ -65,8 +60,8 @@ export interface RoundOptions {
  * count and nothing has changed for `decisionTime`, the pick is made and the
  * round locks → the round unlocks only after *every* finger (picked or not, and
  * any placed while locked) has been lifted. After a rank, lifted fingers stay on
- * screen, and fade out `RANK_LINGER_TIME` after the last one lifts; the round
- * unlocks once they've faded (`RANK_FADE_TIME`).
+ * screen until `finishRank` is called (the app's Done and Start draft buttons, shown
+ * once `rankSettled`); they then fade out (`RANK_FADE_TIME`) and the round unlocks.
  */
 export class Round {
   /** Nodes currently drawn on screen. */
@@ -80,7 +75,7 @@ export class Round {
   private _locked = false;
   private _result: PickResult | null = null;
   private _mode: Mode;
-  /** When the rank's chips start fading out, once everyone has lifted; otherwise null. */
+  /** When the rank's chips started fading out, after `finishRank`; otherwise null. */
   private fadeStart: number | null = null;
 
   private readonly opts: RoundOptions;
@@ -120,6 +115,30 @@ export class Round {
     return Math.min(1, Math.max(0, 1 - (now - this.fadeStart) / RANK_FADE_TIME));
   }
 
+  /**
+   * True once a rank's result is fully shown and nobody is touching the screen: the
+   * moment to offer finishing it (`finishRank`).
+   */
+  rankSettled(now: number): boolean {
+    const result = this._result;
+    if (result?.kind !== 'rank' || this.fadeStart !== null) return false;
+    if (this.touches.size > 0 || this.lingering.size > 0) return false;
+    return result.ranking.every(node => (node.selectedTime ?? Infinity) <= now);
+  }
+
+  /**
+   * Ends a rank's result: the chips fade out over `RANK_FADE_TIME`, then the round unlocks.
+   * Returns the ranking (first place first), or null if there's no rank to finish.
+   */
+  finishRank(): Node[] | null {
+    const result = this._result;
+    if (result?.kind !== 'rank' || this.fadeStart !== null) return null;
+    this.clearTimer();
+    this.fadeStart = this.now();
+    this.timer = setTimeout(() => this.reset(), RANK_FADE_TIME);
+    return [...result.ranking];
+  }
+
   /** Changes the mode. Only allowed while idle; returns whether it took effect. */
   setMode(mode: Mode): boolean {
     if (!this.idle) return false;
@@ -130,9 +149,6 @@ export class Round {
   touchStart(id: number, x: number, y: number): void {
     if (this._locked) {
       this.lingering.add(id);
-      // A touch during the rank's linger holds it (and brings faded chips back) until lifted.
-      this.clearTimer();
-      this.fadeStart = null;
       return;
     }
     if (this.touches.has(id)) return;
@@ -177,15 +193,11 @@ export class Round {
     else if (this.touches.size > 0 || this.lingering.size > 0) this.reset();
   }
 
-  /** Every finger is off a locked round: unlock now, or after a rank's linger. */
+  /** Every finger is off a locked round: unlock now, except a rank, which waits for `finishRank`. */
   private allLifted(): void {
     if (this._result?.kind !== 'rank') return this.reset();
     this.touches.clear();
     this.lingering.clear();
-    if (this.timer === null) {
-      this.fadeStart = this.now() + RANK_LINGER_TIME;
-      this.timer = setTimeout(() => this.reset(), RANK_LINGER_TIME + RANK_FADE_TIME);
-    }
   }
 
   private reset(): void {

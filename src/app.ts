@@ -1,5 +1,6 @@
 import { playScaleSelectedTone, playScaleTone, resumeAudioContext } from "./audio";
 import { modeOf } from "./mode";
+import { createRankActions, openDraft, RankActions } from "./draftView";
 import { createModeSelector, loadSettings, ModeSelector } from "./modeSelector";
 import { drawRegions } from "./regions";
 import { PICK_STAGGER, PickResult, Round } from "./round";
@@ -40,6 +41,29 @@ function playPickSound(result: PickResult) {
 }
 
 let selector: ModeSelector | null = null;
+let rankActions: RankActions | null = null;
+let infoButton: HTMLElement | null = null;
+/** True while the draft screen is open (including while it fades out). */
+let drafting = false;
+
+/** The rank's Done button: fade the chips out and go back to idle. */
+function finishRank() {
+    round.finishRank();
+}
+
+/** The rank's Start draft button: fade the chips out under the draft screen and open it. */
+function startDraft() {
+    const ranking = round.finishRank();
+    if (!ranking) return;
+    drafting = true;
+    openDraft(
+        ranking.map(node => ({ rank: node.rank!, color: node.color, toneIndex: node.toneIndex })),
+        {
+            onTurn: player => playScaleTone(player.toneIndex, TONE_DURATION),
+            onClose: () => (drafting = false),
+        },
+    );
+}
 
 let canvas: HTMLCanvasElement | null = null;
 let ctx: CanvasRenderingContext2D | null = null;
@@ -96,7 +120,11 @@ function step() {
         }
         ctx.globalAlpha = 1;
     }
-    selector?.setHidden(!round.idle);
+    const choosing = !drafting && round.rankSettled(performance.now());
+    rankActions?.setVisible(choosing);
+    // The info button sits where the rank's buttons go on narrow screens.
+    infoButton?.classList.toggle('hidden', choosing);
+    selector?.setHidden(!round.idle || drafting);
     requestAnimationFrame(step);
 }
 
@@ -117,6 +145,7 @@ export function initializeApp() {
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
     selector = createModeSelector(modeSettings, mode => round.setMode(mode));
+    rankActions = createRankActions(finishRank, startDraft);
     requestAnimationFrame(step);
     // Prevent scrolling on touch
     document.body.style.overscrollBehavior = 'none';
@@ -134,6 +163,7 @@ export function initializeApp() {
       </svg>
     `;
     document.body.appendChild(infoBtn);
+    infoButton = infoBtn;
 
     const infoOverlay = document.createElement('div');
     infoOverlay.className = 'info-overlay';
@@ -151,6 +181,9 @@ export function initializeApp() {
           <p>Turn the knob at the top to change what it does: <strong>Choose</strong> one or
           more players, <strong>Split</strong> everyone into teams, or <strong>Rank</strong>
           everyone in order. Tap the number to change it.</p>
+          <p>After a rank, <strong>Start draft</strong> takes turns picking in a fair order:
+          each pick goes to whoever is furthest behind, so going first in one round means
+          going later in the next.</p>
           <p><button type="button" class="info-about">About &amp; install</button></p>
         </div>
       </div>

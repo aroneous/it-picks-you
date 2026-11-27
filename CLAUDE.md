@@ -1,6 +1,6 @@
 # It Picks You: developer notes
 
-A start-player picker. Everyone puts a finger on the screen and after a short wait one of them is chosen at random. It copies the behaviour of the retired app Chwazi. It's a static, client-only PWA with no backend. In production it's served from https://itpicksyou.wily.cc/. Hosting is moving from an Apache vhost to Cloudflare Pages (see Deployment).
+A start-player picker. Everyone puts a finger on the screen and after a short wait one of them is chosen at random. It copies the behaviour of the retired app Chwazi. It's a static, client-only PWA with no backend. In production it's served from https://itpicksyou.wily.cc/ on Cloudflare Pages (see Deployment).
 
 ## Stack and commands
 
@@ -65,12 +65,15 @@ Planned: Playwright E2E tests. Chromium with touch emulation can send multi-touc
 
 ## Deployment
 
-The target is Cloudflare Pages, with `itpicksyou.wily.cc` as a custom domain (a CNAME to `<project>.pages.dev`; the `wily.cc` zone doesn't need to be on Cloudflare). The Apache vhost on the shared server is the previous host and can stay as a fallback until DNS is switched.
+Production is the Cloudflare Pages project `it-picks-you` (https://it-picks-you.pages.dev), with `itpicksyou.wily.cc` as its custom domain. DNS for `wily.cc` stays at DigitalOcean: `itpicksyou` is a CNAME to `it-picks-you.pages.dev` (TTL 12 h), and Cloudflare issues the TLS certificate. Moving the zone to Cloudflare isn't needed for a subdomain. The site used to be served by an Apache vhost on the shared `wily.cc` server. That vhost is no longer in the request path.
 
-One-time setup, done by the owner:
-1. In Cloudflare, create the Pages project: `npx wrangler pages project create <name> --production-branch=main`, or Workers & Pages → Create → Pages → Direct Upload.
-2. Create an API token with Cloudflare Pages: Edit. Add it and the account ID as GitHub secrets, and add the project name as the `CLOUDFLARE_PAGES_PROJECT` variable.
-3. Push to `main`, then check the site at `<project>.pages.dev`.
-4. Add the custom domain `itpicksyou.wily.cc` in the Pages project, then change the DNS record to the CNAME it gives you.
+Deploys are automatic (see CI/CD). There's no manual deploy step. To roll back, open the project in the Cloudflare dashboard → Deployments, and use "Rollback" on an earlier production deployment. Alternatively, revert the commit on `main`.
+
+GitHub configuration that the workflow depends on:
+- Variable `CLOUDFLARE_PAGES_PROJECT` = `it-picks-you`. This is the project name, not the `.pages.dev` hostname.
+- Secret `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with Account → Cloudflare Pages → Edit on the right account. A token without that permission fails with `Authentication error [code: 10000]`.
+- Secret `CLOUDFLARE_ACCOUNT_ID`.
+
+The Pages project uses Direct Upload, with production branch `main`. It must stay that way: a Direct Upload project can't be switched to Cloudflare's Git integration, and Cloudflare's own builds aren't wanted here.
 
 Caching: `public/_headers` (copied into `dist/`) tells Pages to revalidate `sw.js`, `registerSW.js`, `index.html`, `/` and `manifest.webmanifest` on every request, and to cache `assets/*` (content-hashed) as immutable. If the app is ever served from Apache again, set the same headers there. Otherwise clients can get stuck on an old version. The app needs HTTPS, because service workers require it.

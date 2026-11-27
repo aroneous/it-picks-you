@@ -152,7 +152,7 @@ export function initializeApp() {
           more players, <strong>Split</strong> everyone into teams, or <strong>Rank</strong>
           everyone in order. Tap the number to change it.</p>
 
-          <h2>Isn't this just Chwazi but less full-featured?</h2>
+          <h2>Isn't this just Chwazi?</h2>
           <p>...yes, but Chwazi went away, so now you have this.</p>
           <p><button type="button" class="info-about">About &amp; install</button></p>
         </div>

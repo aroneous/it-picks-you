@@ -1,15 +1,39 @@
 import { playScaleSelectedTone, playScaleTone, resumeAudioContext } from "./audio";
-import { Round } from "./round";
+import { createModeSelector, loadMode, ModeSelector } from "./modeSelector";
+import { drawRegions } from "./regions";
+import { PICK_STAGGER, PickResult, Round } from "./round";
 
 const TONE_DURATION = 600; // ms
 const SELECTED_TONE_DURATION = 1200; // ms
 const REMOVE_TOUCH_DURATION = 100; // ms
+/** The single note played when teams are picked (A440 in the scale). */
+const TEAMS_PICK_TONE = 5;
 
 const round = new Round({
     onPlace: node => playScaleTone(node.toneIndex, TONE_DURATION),
     onLift: node => playScaleSelectedTone(node.toneIndex, REMOVE_TOUCH_DURATION),
-    onPick: winner => playScaleSelectedTone(winner.toneIndex, SELECTED_TONE_DURATION),
+    onPick: playPickSound,
+    mode: loadMode(),
 });
+
+/**
+ * Players: each winner's own note, one after another (lowest first) in step with its
+ * region appearing. Teams: one note.
+ */
+function playPickSound(result: PickResult) {
+    if (result.kind === 'teams') {
+        playScaleSelectedTone(TEAMS_PICK_TONE, SELECTED_TONE_DURATION);
+        return;
+    }
+    result.winners.forEach((winner, i) => {
+        const play = () => playScaleSelectedTone(winner.toneIndex, SELECTED_TONE_DURATION);
+        if (i === 0) return play();
+        // Skip notes still pending if everyone has already lifted and the round reset.
+        setTimeout(() => round.result === result && play(), i * PICK_STAGGER);
+    });
+}
+
+let selector: ModeSelector | null = null;
 
 let canvas: HTMLCanvasElement | null = null;
 let ctx: CanvasRenderingContext2D | null = null;
@@ -57,10 +81,14 @@ function step() {
         const height = window.innerHeight;
         ctx.clearRect(0, 0, width, height);
         const radius = Math.min(width, height) / 8;
+        if (round.result?.kind === 'players') {
+            drawRegions(ctx, round.nodes, width, height, radius, performance.now());
+        }
         for (const node of round.nodes) {
             node.draw(ctx, radius);
         }
     }
+    selector?.setHidden(!round.idle);
     requestAnimationFrame(step);
 }
 
@@ -80,6 +108,7 @@ export function initializeApp() {
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+    selector = createModeSelector(round.mode, mode => round.setMode(mode));
     requestAnimationFrame(step);
     // Prevent scrolling on touch
     document.body.style.overscrollBehavior = 'none';
@@ -111,6 +140,8 @@ export function initializeApp() {
           <p>The eternal question: who will go first in the game? This provides the answer!
           All players lay a finger on the screen, and wait a couple of seconds. Your fate will
           be determined.</p>
+          <p>Use the selector at the top to pick more than one player, or to split everyone
+          into teams. Tap the number to change it.</p>
 
           <h2>Isn't this just Chwazi but less full-featured?</h2>
           <p>...yes, but Chwazi went away, so now you have this.</p>

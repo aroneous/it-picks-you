@@ -169,7 +169,7 @@ test('rank: every finger stays in its color and is ranked in turn from first pla
   await expect(page.locator('.mode-selector')).not.toHaveClass(/hidden/);
 });
 
-test('draft: picks follow the Thue–Morse order, building a history', async ({ page }) => {
+test('draft: picks follow the fair-share order, building a history', async ({ page }) => {
   await deterministic(page, { kind: 'rank', count: 1 });
   await page.goto('/');
   const fingers = await Fingers.attach(page);
@@ -186,14 +186,14 @@ test('draft: picks follow the Thue–Morse order, building a history', async ({ 
   await expect(card.locator('.draft-card-number')).toHaveText('1');
   await expect(chips).toHaveCount(0);
 
-  // With three players the order is 1 2 3, 2 3 1, 3 1 2. Next and tapping the card both advance.
+  // With three players the order starts 1 2 3 3 2 1. Next and tapping the card both advance.
   await draft.getByRole('button', { name: 'Next', exact: true }).click();
   await card.click();
   await draft.getByRole('button', { name: 'Next', exact: true }).click();
   await draft.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(chips).toHaveText(['1', '2', '3', '2']);
-  await expect(card.locator('.draft-card-number')).toHaveText('3');
-  await expect(card).toHaveCSS('background-color', 'rgb(0, 128, 0)'); // C, green
+  await expect(chips).toHaveText(['1', '2', '3', '3']);
+  await expect(card.locator('.draft-card-number')).toHaveText('2');
+  await expect(card).toHaveCSS('background-color', 'rgb(0, 0, 255)'); // B, blue
   await expect(chips.nth(1)).toHaveCSS('background-color', 'rgb(0, 0, 255)'); // B, blue
   // Each chip lands in place once its flight finishes.
   await expect(draft.locator('.draft-flyer')).toHaveCount(0);

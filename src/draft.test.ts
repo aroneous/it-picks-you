@@ -1,36 +1,49 @@
 import { describe, expect, it } from 'vitest';
-import { Draft, draftSeat } from './draft';
+import { Draft, FairShareOrder } from './draft';
 
-const seats = (players: number, picks: number) => Array.from({ length: picks }, (_, k) => draftSeat(players, k));
+const letters = (n: number, picks: number) =>
+  new FairShareOrder(n).prefix(picks).map(s => String.fromCharCode(65 + s)).join('');
 
-describe('draftSeat', () => {
+/** Splits a sequence into rounds of two passes (2n picks) for readability. */
+const rounds = (n: number, count: number) => letters(n, 2 * n * count).match(new RegExp(`.{${2 * n}}`, 'g'));
+
+describe('FairShareOrder', () => {
   it('is the Thue–Morse sequence for two players', () => {
-    expect(seats(2, 16).join('')).toBe('0110100110010110');
+    expect(letters(2, 16)).toBe('ABBABAABBAABABBA');
   });
 
-  it('generalises to more players by base-n digit sums', () => {
-    expect(seats(3, 9).join('')).toBe('012120201');
-    expect(seats(4, 8).join('')).toBe('01231230');
+  // The opening rounds of the published fair-share tables.
+  it.each([
+    [3, ['ABCCBA', 'CBAABC', 'BCAACB', 'ACBBCA']],
+    [4, ['ABCDDCBA', 'DCBAABCD', 'CBDAADBC', 'ADBCCBDA']],
+    [5, ['ABCDEEDCBA', 'EDCBAABCDE', 'CDBEAAEBDC', 'BAEDCCDEAB']],
+    [7, ['ABCDEFGGFEDCBA', 'GFEDCBAABCDEFG', 'DECFBGAAGBFCED', 'BAFGCEDDECGFAB']],
+    [10, ['ABCDEFGHIJJIHGFEDCBA', 'JIHGFEDCBAABCDEFGHIJ', 'FEGDHCIBJAAJBICHDGEF', 'BCIAHJDGEFFEGDJHAICB']],
+  ])('matches the published table for %i players', (n, expected) => {
+    expect(rounds(n, expected.length)).toEqual(expected);
   });
 
   it('always gives a single player every pick', () => {
-    expect(seats(1, 5)).toEqual([0, 0, 0, 0, 0]);
+    expect(letters(1, 5)).toBe('AAAAA');
   });
 
-  it('balances pick counts and position sums over each block of n^m picks', () => {
-    for (const n of [2, 3, 4, 5, 6]) {
-      for (const m of [1, 2, 3]) {
-        const block = n ** m;
-        const counts = new Array(n).fill(0);
-        const sums = new Array(n).fill(0);
-        seats(n, block).forEach((s, k) => {
-          counts[s]++;
-          sums[s] += k;
-        });
-        expect(new Set(counts).size).toBe(1);
-        if (m >= 2) expect(new Set(sums).size).toBe(1);
+  it('plays each round as an order and then its reverse, so pick positions even out every round', () => {
+    for (let n = 2; n <= 12; n++) {
+      const seats = new FairShareOrder(n).prefix(2 * n * 40);
+      for (let r = 0; r < seats.length; r += 2 * n) {
+        const there = seats.slice(r, r + n);
+        const back = seats.slice(r + n, r + 2 * n);
+        expect(new Set(there).size).toBe(n);
+        expect(back).toEqual([...there].reverse());
       }
     }
+  });
+
+  it('gives the same answer however far it has been extended', () => {
+    const order = new FairShareOrder(4);
+    const later = order.seat(99);
+    expect(new FairShareOrder(4).prefix(100)[99]).toBe(later);
+    expect(order.prefix(100)).toEqual(new FairShareOrder(4).prefix(100));
   });
 });
 
@@ -45,9 +58,9 @@ describe('Draft', () => {
     const draft = new Draft(players);
     expect(draft.current.rank).toBe(1);
     const order = [];
-    for (let i = 0; i < 9; i++) order.push(draft.next().rank);
-    expect(order).toEqual([1, 2, 3, 2, 3, 1, 3, 1, 2]);
-    expect(draft.pick).toBe(9);
+    for (let i = 0; i < 12; i++) order.push(draft.next().rank);
+    expect(order).toEqual([1, 2, 3, 3, 2, 1, 3, 2, 1, 1, 2, 3]);
+    expect(draft.pick).toBe(12);
     expect(draft.history.map(p => p.rank)).toEqual(order);
   });
 

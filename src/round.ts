@@ -15,7 +15,7 @@ export type PickResult =
 export const WAIT_DECISION_TIME = 2000; // ms
 
 /** Time between revealing one winner and the next when picking several players. */
-export const PICK_STAGGER = 500; // ms
+export const PICK_STAGGER = 300; // ms
 
 export const COLOR_LIST = [
   'red', 'blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink'

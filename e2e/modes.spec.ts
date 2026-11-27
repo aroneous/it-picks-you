@@ -58,9 +58,9 @@ test('two players: each winner gets a region, with a gap along the boundary', as
   const fingers = await Fingers.attach(page);
   await fingers.place(A, B, C);
 
-  // Winners are revealed lowest tone first: A (placed first), then B half a second later.
+  // Winners are revealed lowest tone first: A (placed first), then B PICK_STAGGER (0.3 s) later.
   // As soon as A's region reaches C's spot, B's region (the corner) is still empty.
-  // Poll quickly: the default back-off (up to 1 s between polls) can overshoot the 0.5 s window.
+  // Poll quickly: the default back-off (up to 1 s between polls) can overshoot the 0.3 s window.
   await expect.poll(() => rgbaAt(page, C.x, C.y), { timeout: PICK_TIMEOUT, intervals: [20] }).toEqual(RED);
   expect(await alphaAt(page, CORNER.x, CORNER.y)).toBe(0);
   await expect.poll(() => alphaAt(page, CORNER.x, CORNER.y), { timeout: 2000 }).toBe(255);

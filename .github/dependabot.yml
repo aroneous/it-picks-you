@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # npm: one grouped PR per week for minor/patch updates; majors come as separate PRs.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Keep Node type definitions on the same major as the runtime in .nvmrc.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

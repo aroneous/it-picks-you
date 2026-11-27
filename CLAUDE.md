@@ -4,12 +4,12 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 
 ## Stack and commands
 
-- TypeScript (strict) + Vite 7 + `vite-plugin-pwa` (Workbox `generateSW`). There's no UI framework: everything is drawn on a full-screen `<canvas>`, and the info button and overlay are added with plain DOM calls.
+- TypeScript 7 (strict) + Vite 8 + `vite-plugin-pwa` 2 (Workbox `generateSW`; `workbox-build` and `workbox-window` are direct dev dependencies, as v2 requires). Vitest 4, Playwright. There's no UI framework: everything is drawn on a full-screen `<canvas>`, and the info button and overlay are added with plain DOM calls.
 - Node version: `.nvmrc` (24). CI uses the same version.
 - `npm run dev`: dev server on `0.0.0.0` over HTTPS (`vite-plugin-mkcert` makes a local cert, for the dev server only; `vite preview` and builds don't use it). You need HTTPS to open the dev server from a phone on the LAN, because service workers and some audio features only work in a secure context. The service worker is also turned on in dev (`devOptions.enabled`). Its output goes to `dev-dist/`, which is gitignored.
 - `npm run build`: runs `tsc` (type-check only; `noEmit` is set), then `vite build`, and writes to `dist/`.
 - `npm run preview`: serves `dist/` locally.
-- `npm run typecheck`: `tsc` on its own. Test files are type-checked too.
+- `npm run typecheck`: `tsc` on its own. Test files, `e2e/` and `playwright.config.ts` are type-checked too. TypeScript 7 removed `moduleResolution: node`, so the project uses `Bundler`. It also no longer picks up `@types/*` packages automatically: `tsconfig.json` lists `types: ["node"]`, which Playwright's config needs for `process`.
 - `npm test`: runs the Vitest suite once. `npm run test:watch` runs it in watch mode.
 - `npm run test:e2e`: builds, then runs the Playwright E2E tests against `vite preview`. Run `npx playwright install chromium` once first. After a build, `npx playwright test` skips rebuilding.
 
@@ -42,7 +42,7 @@ Timing constants: `WAIT_DECISION_TIME` in `round.ts`, tone durations in `app.ts`
 ## Known issues and rough edges
 
 - The PWA has `registerType: 'autoUpdate'`, so a new deploy takes over on the next load after the service worker sees the new `sw.js`. The extra `CacheFirst` runtime cache for documents and scripts is mostly redundant with precaching, and for anything not precached it could keep stale copies for up to 90 days.
-- `npm audit` reports advisories in build-time dev dependencies (Babel via Workbox, and Vitest 3). None of them reach the shipped bundle. Upgrading to Vitest 4 is the main fix.
+- `npm audit` reports 4 moderate advisories, all in `minimatch` via `workbox-build`. They only affect the build and don't reach the shipped bundle. The only fix npm offers is downgrading `workbox-build`, so leave them until Workbox updates its dependency.
 - The E2E tests run only in Chromium. Safari on iOS is the most likely place for touch or audio differences, so check changes to `app.ts` or `audio.ts` on an iPhone or iPad too.
 
 ## Testing
@@ -67,6 +67,7 @@ Timing constants: `WAIT_DECISION_TIME` in `round.ts`, tone durations in `app.ts`
 - A push to `main` deploys to production. The Pages project's production branch must be `main`.
 - A pull request from a branch in this repo deploys a preview, and its URL appears in the run summary. Pull requests from forks are built and tested but never deployed, because they can't see the secrets.
 - The deploy step is skipped until the repository **variable** `CLOUDFLARE_PAGES_PROJECT` is set. It also needs the repository **secrets** `CLOUDFLARE_API_TOKEN` (permission: Account → Cloudflare Pages → Edit) and `CLOUDFLARE_ACCOUNT_ID`.
+- Dependabot (`.github/dependabot.yml`) opens weekly PRs: one grouped PR for npm minor and patch updates, separate PRs for npm majors, and one for GitHub Actions. It ignores major updates to `@types/node`, which tracks the Node major in `.nvmrc`; bump both together by hand. CI runs every Dependabot PR through the full test suite and deploys a preview.
 - Cloudflare's own Git integration is not used. GitHub Actions builds the site and uploads it ("Direct Upload"), so deploys don't count against the free plan's monthly build limit.
 
 ## Deployment

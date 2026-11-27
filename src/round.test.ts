@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { COLOR_LIST, PICK_STAGGER, PickResult, RANK_FADE_TIME, RANK_LINGER_TIME, Round, RoundOptions, TEAM_COLORS, WAIT_DECISION_TIME } from './round';
+import { COLOR_LIST, PICK_STAGGER, PickResult, RANK_FADE_TIME, Round, RoundOptions, TEAM_COLORS, WAIT_DECISION_TIME } from './round';
 import { MAX_COUNT } from './mode';
 import { Node } from './state';
 
@@ -328,56 +328,71 @@ describe('Round', () => {
       expect(ranking.map(n => n.selectedTime)).toEqual([1000, 1000 + PICK_STAGGER, 1000 + 2 * PICK_STAGGER]);
     });
 
-    it('keeps lifted fingers on screen, then fades them out and unlocks', () => {
+    it('keeps lifted fingers on screen until the rank is finished, then fades them out and unlocks', () => {
       const { round } = makeRound({ mode: { kind: 'rank', count: 1 } });
       [1, 2].forEach(id => round.touchStart(id, 0, 0));
       vi.advanceTimersByTime(WAIT_DECISION_TIME);
       round.touchEnd(1);
       expect(round.nodes).toHaveLength(2);
-      vi.advanceTimersByTime(RANK_LINGER_TIME * 2);
-      expect(round.locked).toBe(true);
       round.touchEnd(2);
       round.noTouchesRemaining(); // app.ts calls this after the last touchend too
+      vi.advanceTimersByTime(60_000);
+      expect(round.locked).toBe(true);
       expect(round.nodes).toHaveLength(2);
-      vi.advanceTimersByTime(RANK_LINGER_TIME + RANK_FADE_TIME - 1);
+
+      const ranking = round.finishRank();
+      expect(ranking?.map(n => n.rank)).toEqual([1, 2]);
+      expect(round.finishRank()).toBeNull(); // already finishing
+      vi.advanceTimersByTime(RANK_FADE_TIME - 1);
       expect(round.locked).toBe(true);
       vi.advanceTimersByTime(1);
       expect(round.locked).toBe(false);
+      expect(round.idle).toBe(true);
       expect(round.nodes).toHaveLength(0);
     });
 
-    it('holds the linger while a new touch is down, and restarts it when that lifts', () => {
-      const { round } = makeRound({ mode: { kind: 'rank', count: 1 } });
-      [1, 2].forEach(id => round.touchStart(id, 0, 0));
+    it('is settled once every rank is shown and nobody is touching', () => {
+      const { round } = makeRound({ mode: { kind: 'rank', count: 1 }, now: () => 1000 });
+      [1, 2, 3].forEach(id => round.touchStart(id, 0, 0));
       vi.advanceTimersByTime(WAIT_DECISION_TIME);
+      const lastReveal = 1000 + 2 * PICK_STAGGER;
       round.touchEnd(1);
       round.touchEnd(2);
-      vi.advanceTimersByTime(RANK_LINGER_TIME / 2);
-      round.touchStart(3, 0, 0);
-      vi.advanceTimersByTime(RANK_LINGER_TIME * 2);
-      expect(round.locked).toBe(true);
-      expect(round.nodes).toHaveLength(2); // the new touch isn't shown
+      expect(round.rankSettled(lastReveal)).toBe(false); // a finger is still down
       round.touchEnd(3);
-      vi.advanceTimersByTime(RANK_LINGER_TIME + RANK_FADE_TIME - 1);
-      expect(round.locked).toBe(true);
-      vi.advanceTimersByTime(1);
-      expect(round.locked).toBe(false);
+      expect(round.rankSettled(lastReveal - 1)).toBe(false); // third place not shown yet
+      expect(round.rankSettled(lastReveal)).toBe(true);
+      round.touchStart(4, 0, 0); // a stray touch while the result is up isn't shown...
+      expect(round.nodes).toHaveLength(3);
+      expect(round.rankSettled(lastReveal)).toBe(false); // ...but holds off the choice
+      round.touchEnd(4);
+      expect(round.rankSettled(lastReveal)).toBe(true);
+      round.finishRank();
+      expect(round.rankSettled(lastReveal)).toBe(false);
+    });
+
+    it('only finishes a rank', () => {
+      const { round } = makeRound();
+      [1, 2].forEach(id => round.touchStart(id, 0, 0));
+      vi.advanceTimersByTime(WAIT_DECISION_TIME);
+      expect(round.rankSettled(Infinity)).toBe(false);
+      expect(round.finishRank()).toBeNull();
     });
   });
 
-  it('fades the chips out after the linger, and back in if someone touches', () => {
+  it('fades the chips out once the rank is finished', () => {
     let now = 0;
     const { round } = makeRound({ mode: { kind: 'rank', count: 1 }, now: () => now });
     [1, 2].forEach(id => round.touchStart(id, 0, 0));
     vi.advanceTimersByTime(WAIT_DECISION_TIME);
-    expect(round.opacityAt(now)).toBe(1);
     round.touchEnd(1);
     round.touchEnd(2);
-    expect(round.opacityAt(RANK_LINGER_TIME)).toBe(1);
-    expect(round.opacityAt(RANK_LINGER_TIME + RANK_FADE_TIME / 2)).toBeCloseTo(0.5);
-    expect(round.opacityAt(RANK_LINGER_TIME + RANK_FADE_TIME)).toBe(0);
-    round.touchStart(3, 0, 0);
-    expect(round.opacityAt(RANK_LINGER_TIME + RANK_FADE_TIME)).toBe(1);
+    now = 5000;
+    expect(round.opacityAt(now)).toBe(1);
+    round.finishRank();
+    expect(round.opacityAt(now)).toBe(1);
+    expect(round.opacityAt(now + RANK_FADE_TIME / 2)).toBeCloseTo(0.5);
+    expect(round.opacityAt(now + RANK_FADE_TIME)).toBe(0);
   });
 
   describe('setMode', () => {

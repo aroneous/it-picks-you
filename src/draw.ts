@@ -29,6 +29,11 @@ export function drawNode(
 /** Finger colors light enough that dark text reads better on them than white. */
 const LIGHT_COLORS = new Set(['yellow', 'lime', 'cyan', 'orange', 'pink']);
 
+/** The color for a label drawn on a finger color: dark on light colors, white otherwise. */
+export function labelColorOn(color: string): string {
+  return LIGHT_COLORS.has(color) ? 'rgba(0, 0, 0, 0.8)' : '#fff';
+}
+
 /** How many times the label repeats around a chip's edge. */
 export const CHIP_LABEL_REPEATS = 8;
 
@@ -61,7 +66,7 @@ export function drawChip(
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
   ctx.stroke();
 
-  ctx.fillStyle = LIGHT_COLORS.has(color) ? 'rgba(0, 0, 0, 0.8)' : '#fff';
+  ctx.fillStyle = labelColorOn(color);
   ctx.font = `700 ${0.26 * radius}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

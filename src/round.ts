@@ -34,6 +34,12 @@ export const TEAM_COLORS = ['red', 'blue', 'yellow', 'lime', 'magenta'];
 
 export const MAX_TONES = 10;
 
+/**
+ * After a rank, how long the chips stay on screen once every finger has lifted. Fingers
+ * cover the numbers, so people lift them to read the result.
+ */
+export const RANK_LINGER_TIME = 1000; // ms
+
 export interface RoundOptions {
   /** Called when a finger joins the round. */
   onPlace?(node: Node): void;
@@ -56,7 +62,8 @@ export interface RoundOptions {
  * Lifecycle: fingers are placed → once there are more fingers than the mode's
  * count and nothing has changed for `decisionTime`, the pick is made and the
  * round locks → the round unlocks only after *every* finger (picked or not, and
- * any placed while locked) has been lifted.
+ * any placed while locked) has been lifted. After a rank, lifted fingers stay on
+ * screen, and the round unlocks `RANK_LINGER_TIME` after the last one lifts.
  */
 export class Round {
   /** Nodes currently drawn on screen. */
@@ -112,6 +119,7 @@ export class Round {
   touchStart(id: number, x: number, y: number): void {
     if (this._locked) {
       this.lingering.add(id);
+      this.clearTimer(); // a touch during the rank's linger holds it until lifted
       return;
     }
     if (this.touches.has(id)) return;
@@ -135,11 +143,12 @@ export class Round {
     const node = this.touches.get(id);
     if (node) {
       this.touches.delete(id);
-      this.removeNode(node);
+      // Ranked fingers stay on screen after lifting, so the numbers can be read.
+      if (this._result?.kind !== 'rank') this.removeNode(node);
       if (!this._locked) this.opts.onLift?.(node);
     }
     if (this._locked) {
-      if (this.touches.size === 0 && this.lingering.size === 0) this.reset();
+      if (this.touches.size === 0 && this.lingering.size === 0) this.allLifted();
     } else {
       this.updateTimer();
     }
@@ -151,7 +160,18 @@ export class Round {
    * touchend can't leave the round stuck.
    */
   noTouchesRemaining(): void {
-    if (this.touches.size > 0 || this.lingering.size > 0 || this._locked) this.reset();
+    if (this._locked) this.allLifted();
+    else if (this.touches.size > 0 || this.lingering.size > 0) this.reset();
+  }
+
+  /** Every finger is off a locked round: unlock now, or after a rank's linger. */
+  private allLifted(): void {
+    if (this._result?.kind !== 'rank') return this.reset();
+    this.touches.clear();
+    this.lingering.clear();
+    if (this.timer === null) {
+      this.timer = setTimeout(() => this.reset(), RANK_LINGER_TIME);
+    }
   }
 
   private reset(): void {

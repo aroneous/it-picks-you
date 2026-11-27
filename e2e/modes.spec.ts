@@ -133,6 +133,22 @@ test('rank: every finger stays in its color and is ranked in turn from first pla
   expect(await rgbaAt(page, C.x, C.y)).toEqual(GREEN);
   expect(await alphaAt(page, CORNER.x, CORNER.y)).toBe(0);
 
+  // The chips stay up for RANK_LINGER_TIME (1 s) after the last finger lifts.
   await fingers.liftAll();
+  await nextFrames(page);
+  expect(await rgbaAt(page, A.x, A.y)).toEqual(RED);
+  await expect(page.locator('.mode-selector')).toHaveClass(/hidden/);
+  await expect.poll(() => alphaAt(page, A.x, A.y), { timeout: 3000 }).toBe(0);
   await expect(page.locator('.mode-selector')).not.toHaveClass(/hidden/);
+});
+
+test('the knob stays put when the mode changes', async ({ page }) => {
+  await page.goto('/');
+  const knob = page.locator('.mode-knob');
+  const before = await knob.boundingBox();
+  for (let i = 0; i < 3; i++) {
+    await knob.click();
+    await expect(knob).toHaveCount(1);
+    expect(await knob.boundingBox()).toEqual(before);
+  }
 });

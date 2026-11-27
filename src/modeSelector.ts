@@ -1,4 +1,4 @@
-import { hasCount, kindLabel, Mode, MODE_KINDS, modeName, nextCount, nextKind, parseMode } from "./mode";
+import { hasCount, kindLabel, MAX_COUNT, minCount, Mode, MODE_KINDS, modeName, nextCount, nextKind, parseMode } from "./mode";
 
 const STORAGE_KEY = 'itpicksyou.mode';
 
@@ -34,8 +34,9 @@ const KNOB_STEP = 360 / MODE_KINDS.length; // degrees
  * Split the capsule's number cycles on tap.
  *
  * Changing mode swaps the capsule: the old one slides down, shrinks and fades out while
- * the new one comes in from above. The capsule's slot animates to the new width so the
- * centered selector doesn't jump.
+ * the new one comes in from above. The capsule's slot is as wide as the widest capsule, so
+ * the knob stays in the same place whatever the mode; narrower capsules leave space on the
+ * right.
  *
  * `onChange` is asked to apply each new mode and returns whether it did, so the
  * selector never shows a mode that the round didn't accept.
@@ -61,14 +62,29 @@ export function createModeSelector(initial: Mode, onChange: (mode: Mode) => bool
   root.append(knob, slot);
   document.body.appendChild(root);
 
-  let capsule = buildCapsule();
+  let capsule = buildCapsule(mode);
   slot.appendChild(capsule);
   renderKnob();
   fitSlot();
-  // Only animate width changes after the first layout.
-  requestAnimationFrame(() => slot.classList.add('animated'));
+  document.fonts?.ready.then(fitSlot);
 
-  function buildCapsule(): HTMLElement {
+  /** Sizes the slot to the widest capsule any mode can show. */
+  function fitSlot() {
+    let widest = 0;
+    for (const kind of MODE_KINDS) {
+      for (let count = minCount(kind); count <= MAX_COUNT; count++) {
+        const probe = buildCapsule({ kind, count });
+        probe.style.visibility = 'hidden';
+        slot.appendChild(probe);
+        widest = Math.max(widest, probe.offsetWidth);
+        probe.remove();
+        if (!hasCount(kind)) break;
+      }
+    }
+    slot.style.width = `${widest}px`;
+  }
+
+  function buildCapsule(mode: Mode): HTMLElement {
     const el = document.createElement('div');
     el.className = 'mode-capsule';
     const name = document.createElement('span');
@@ -78,18 +94,22 @@ export function createModeSelector(initial: Mode, onChange: (mode: Mode) => bool
     if (hasCount(mode.kind)) {
       const count = document.createElement('button');
       count.className = 'mode-count';
-      count.addEventListener('click', () => update(nextCount(mode), false));
+      count.addEventListener('click', () => update(nextCount(current()), false));
       el.appendChild(count);
     }
     const kind = document.createElement('span');
     kind.className = 'mode-kind';
     el.appendChild(kind);
-    fillCapsule(el);
+    fillCapsule(el, mode);
     return el;
   }
 
+  function current(): Mode {
+    return mode;
+  }
+
   /** Updates the parts of the capsule that change within a mode: the number and its noun. */
-  function fillCapsule(el: HTMLElement) {
+  function fillCapsule(el: HTMLElement, mode: Mode) {
     const count = el.querySelector('.mode-count');
     if (count) {
       count.textContent = String(mode.count);
@@ -105,10 +125,6 @@ export function createModeSelector(initial: Mode, onChange: (mode: Mode) => bool
     knob.setAttribute('aria-label', `Mode: ${modeName(mode.kind)} ${count}${kindLabel(mode)}. Tap for ${next}.`);
   }
 
-  function fitSlot() {
-    slot.style.width = `${capsule.offsetWidth}px`;
-  }
-
   function swapCapsule() {
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const old = capsule;
@@ -116,9 +132,8 @@ export function createModeSelector(initial: Mode, onChange: (mode: Mode) => bool
     old.setAttribute('aria-hidden', 'true');
     old.inert = true;
     old.getAnimations().forEach(a => a.cancel());
-    capsule = buildCapsule();
+    capsule = buildCapsule(mode);
     slot.appendChild(capsule);
-    fitSlot();
     if (reduceMotion) {
       old.remove();
       return;
@@ -143,8 +158,7 @@ export function createModeSelector(initial: Mode, onChange: (mode: Mode) => bool
       knobAngle += KNOB_STEP;
       swapCapsule();
     } else {
-      fillCapsule(capsule);
-      fitSlot();
+      fillCapsule(capsule, mode);
     }
     renderKnob();
   }

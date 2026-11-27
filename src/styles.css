@@ -117,7 +117,8 @@
 /*
  * Mode selector: a knob that turns through the modes, and a capsule to its right describing
  * the current one. Capsules are absolutely positioned in .mode-slot so the old and new ones
- * can overlap while they animate; modeSelector.ts sets the slot's width.
+ * can overlap while they animate. modeSelector.ts sizes the slot to the widest capsule, so
+ * the knob never moves.
  */
 .mode-selector {
 	position: fixed;
@@ -146,48 +147,48 @@
 	padding: 0;
 }
 
+/*
+ * The knob looks the same in every mode, like a soft button: a plain face with fine,
+ * even knurling round the rim. Only the knurled ring (.mode-knob-dial) turns; the face is
+ * drawn on top by ::after and stays still, so its shading doesn't rotate. The knurl
+ * period (6deg) divides the 120deg step, so the knob looks identical after each turn.
+ */
 .mode-knob {
+	position: relative;
 	flex: none;
 	width: 44px;
 	height: 44px;
 	border-radius: 50%;
 	background: transparent;
-	box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+	box-shadow: 0 2px 6px rgba(0,0,0,0.45);
 	transition: transform 0.15s;
 }
 .mode-knob:active {
 	transform: scale(0.94);
 }
-/* The knob face: grip ridges round the edge, a domed center, and a pointer line. */
 .mode-knob-dial {
-	position: relative;
-	display: block;
-	width: 100%;
-	height: 100%;
+	position: absolute;
+	inset: 0;
 	border-radius: 50%;
 	background:
-		radial-gradient(circle at 50% 35%, #4a4c57 0 52%, transparent 53%),
-		repeating-conic-gradient(#3a3c45 0 6deg, #25262d 6deg 12deg);
-	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
-	transition: transform 0.35s cubic-bezier(0.3, 1.4, 0.5, 1);
+		repeating-conic-gradient(rgba(255,255,255,0.11) 0 3deg, rgba(255,255,255,0.03) 3deg 6deg),
+		#2a2b32;
+	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+	transition: transform 0.4s cubic-bezier(0.3, 1.3, 0.5, 1);
 }
-.mode-knob-dial::after {
+.mode-knob::after {
 	content: '';
 	position: absolute;
-	left: calc(50% - 1.5px);
-	top: 5px;
-	width: 3px;
-	height: 14px;
-	border-radius: 2px;
-	background: #eee;
+	inset: 4px;
+	border-radius: 50%;
+	background: radial-gradient(circle at 50% 30%, #42444d, #2c2d34 75%);
+	box-shadow: 0 0 0 1px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+	pointer-events: none;
 }
 
 .mode-slot {
 	position: relative;
 	height: 44px;
-}
-.mode-slot.animated {
-	transition: width 0.25s ease;
 }
 .mode-capsule {
 	position: absolute;

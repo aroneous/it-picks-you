@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { COLOR_LIST, PICK_STAGGER, PickResult, RANK_LINGER_TIME, Round, RoundOptions, TEAM_COLORS, WAIT_DECISION_TIME } from './round';
+import { COLOR_LIST, PICK_STAGGER, PickResult, RANK_FADE_TIME, RANK_LINGER_TIME, Round, RoundOptions, TEAM_COLORS, WAIT_DECISION_TIME } from './round';
 import { MAX_COUNT } from './mode';
 import { Node } from './state';
 
@@ -328,7 +328,7 @@ describe('Round', () => {
       expect(ranking.map(n => n.selectedTime)).toEqual([1000, 1000 + PICK_STAGGER, 1000 + 2 * PICK_STAGGER]);
     });
 
-    it('keeps lifted fingers on screen, and unlocks RANK_LINGER_TIME after the last lifts', () => {
+    it('keeps lifted fingers on screen, then fades them out and unlocks', () => {
       const { round } = makeRound({ mode: { kind: 'rank', count: 1 } });
       [1, 2].forEach(id => round.touchStart(id, 0, 0));
       vi.advanceTimersByTime(WAIT_DECISION_TIME);
@@ -339,7 +339,7 @@ describe('Round', () => {
       round.touchEnd(2);
       round.noTouchesRemaining(); // app.ts calls this after the last touchend too
       expect(round.nodes).toHaveLength(2);
-      vi.advanceTimersByTime(RANK_LINGER_TIME - 1);
+      vi.advanceTimersByTime(RANK_LINGER_TIME + RANK_FADE_TIME - 1);
       expect(round.locked).toBe(true);
       vi.advanceTimersByTime(1);
       expect(round.locked).toBe(false);
@@ -358,11 +358,26 @@ describe('Round', () => {
       expect(round.locked).toBe(true);
       expect(round.nodes).toHaveLength(2); // the new touch isn't shown
       round.touchEnd(3);
-      vi.advanceTimersByTime(RANK_LINGER_TIME - 1);
+      vi.advanceTimersByTime(RANK_LINGER_TIME + RANK_FADE_TIME - 1);
       expect(round.locked).toBe(true);
       vi.advanceTimersByTime(1);
       expect(round.locked).toBe(false);
     });
+  });
+
+  it('fades the chips out after the linger, and back in if someone touches', () => {
+    let now = 0;
+    const { round } = makeRound({ mode: { kind: 'rank', count: 1 }, now: () => now });
+    [1, 2].forEach(id => round.touchStart(id, 0, 0));
+    vi.advanceTimersByTime(WAIT_DECISION_TIME);
+    expect(round.opacityAt(now)).toBe(1);
+    round.touchEnd(1);
+    round.touchEnd(2);
+    expect(round.opacityAt(RANK_LINGER_TIME)).toBe(1);
+    expect(round.opacityAt(RANK_LINGER_TIME + RANK_FADE_TIME / 2)).toBeCloseTo(0.5);
+    expect(round.opacityAt(RANK_LINGER_TIME + RANK_FADE_TIME)).toBe(0);
+    round.touchStart(3, 0, 0);
+    expect(round.opacityAt(RANK_LINGER_TIME + RANK_FADE_TIME)).toBe(1);
   });
 
   describe('setMode', () => {

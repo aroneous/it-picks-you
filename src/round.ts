@@ -39,6 +39,8 @@ export const MAX_TONES = 10;
  * cover the numbers, so people lift them to read the result.
  */
 export const RANK_LINGER_TIME = 1000; // ms
+/** After the linger, the chips fade out over this long, then the round unlocks. */
+export const RANK_FADE_TIME = 250; // ms
 
 export interface RoundOptions {
   /** Called when a finger joins the round. */
@@ -63,7 +65,8 @@ export interface RoundOptions {
  * count and nothing has changed for `decisionTime`, the pick is made and the
  * round locks → the round unlocks only after *every* finger (picked or not, and
  * any placed while locked) has been lifted. After a rank, lifted fingers stay on
- * screen, and the round unlocks `RANK_LINGER_TIME` after the last one lifts.
+ * screen, and fade out `RANK_LINGER_TIME` after the last one lifts; the round
+ * unlocks once they've faded (`RANK_FADE_TIME`).
  */
 export class Round {
   /** Nodes currently drawn on screen. */
@@ -77,6 +80,8 @@ export class Round {
   private _locked = false;
   private _result: PickResult | null = null;
   private _mode: Mode;
+  /** When the rank's chips start fading out, once everyone has lifted; otherwise null. */
+  private fadeStart: number | null = null;
 
   private readonly opts: RoundOptions;
   private readonly random: () => number;
@@ -109,6 +114,12 @@ export class Round {
     return !this._locked && this.touches.size === 0 && this.lingering.size === 0;
   }
 
+  /** How opaque to draw the nodes at `now`: 1, except while a rank's chips fade out. */
+  opacityAt(now: number): number {
+    if (this.fadeStart === null) return 1;
+    return Math.min(1, Math.max(0, 1 - (now - this.fadeStart) / RANK_FADE_TIME));
+  }
+
   /** Changes the mode. Only allowed while idle; returns whether it took effect. */
   setMode(mode: Mode): boolean {
     if (!this.idle) return false;
@@ -119,7 +130,9 @@ export class Round {
   touchStart(id: number, x: number, y: number): void {
     if (this._locked) {
       this.lingering.add(id);
-      this.clearTimer(); // a touch during the rank's linger holds it until lifted
+      // A touch during the rank's linger holds it (and brings faded chips back) until lifted.
+      this.clearTimer();
+      this.fadeStart = null;
       return;
     }
     if (this.touches.has(id)) return;
@@ -170,7 +183,8 @@ export class Round {
     this.touches.clear();
     this.lingering.clear();
     if (this.timer === null) {
-      this.timer = setTimeout(() => this.reset(), RANK_LINGER_TIME);
+      this.fadeStart = this.now() + RANK_LINGER_TIME;
+      this.timer = setTimeout(() => this.reset(), RANK_LINGER_TIME + RANK_FADE_TIME);
     }
   }
 
@@ -181,6 +195,7 @@ export class Round {
     this.nodes.length = 0;
     this._locked = false;
     this._result = null;
+    this.fadeStart = null;
   }
 
   private updateTimer(): void {

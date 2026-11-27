@@ -87,9 +87,11 @@ function step() {
         if (round.result?.kind === 'players') {
             drawRegions(ctx, round.nodes, width, height, radius, performance.now());
         }
+        ctx.globalAlpha = round.opacityAt(performance.now());
         for (const node of round.nodes) {
             node.draw(ctx, radius);
         }
+        ctx.globalAlpha = 1;
     }
     selector?.setHidden(!round.idle);
     requestAnimationFrame(step);

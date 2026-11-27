@@ -1,10 +1,10 @@
 # It Always Picks You: developer notes
 
-A start-player picker. Everyone puts a finger on the screen and after a short wait one of them is chosen at random. A selector at the top can change this to several players, or to splitting everyone into teams. It copies the behaviour of the retired app Chwazi. It's a static, client-only PWA with no backend. In production it's served from https://itpicksyou.wily.cc/ on Cloudflare Pages (see Deployment).
+A start-player picker. Everyone puts a finger on the screen and after a short wait one of them is chosen at random. A selector at the top can change this to several players, splitting everyone into teams, or ranking everyone. It copies the behaviour of the retired app Chwazi. It's a static, client-only PWA with no backend. In production it's served from https://itpicksyou.wily.cc/ on Cloudflare Pages (see Deployment).
 
 ## Stack and commands
 
-- TypeScript 7 (strict) + Vite 8 + `vite-plugin-pwa` 2 (Workbox `generateSW`; `workbox-build` and `workbox-window` are direct dev dependencies, as v2 requires). Vitest 4, Playwright. There's no UI framework: everything is drawn on a full-screen `<canvas>`, and the info button and overlay are added with plain DOM calls.
+- TypeScript 7 (strict) + Vite 8 + `vite-plugin-pwa` 2 (Workbox `generateSW`; `workbox-build` and `workbox-window` are direct dev dependencies, as v2 requires). Vitest 4, Playwright. There's no UI framework: everything is drawn on a full-screen `<canvas>`, and the mode selector, info button and overlay are added with plain DOM calls.
 - Node version: `.nvmrc` (24). CI uses the same version.
 - `npm run dev`: dev server on `0.0.0.0` over HTTPS (`vite-plugin-mkcert` makes a local cert, for the dev server only; `vite preview` and builds don't use it). You need HTTPS to open the dev server from a phone on the LAN, because service workers and some audio features only work in a secure context. The service worker is also turned on in dev (`devOptions.enabled`). Its output goes to `dev-dist/`, which is gitignored.
 - `npm run build`: runs `tsc` (type-check only; `noEmit` is set), then `vite build`, and writes to `dist/`.
@@ -22,15 +22,15 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 | `splash.ts` | The splash's Start button (sets the seen flag, unlocks audio, fades out) and `showSplash()`, used by "About & install" in the info overlay. |
 | `index.ts` | Entry point. On `DOMContentLoaded` it checks for touch support (shows a "needs touch" message if there isn't any, but still starts the app) and calls `initializeApp()`. |
 | `app.ts` | The browser side: creates the canvas, forwards touch events to a `Round`, plays sounds from the `Round` callbacks, runs the render loop, and builds the info button and overlay. |
-| `round.ts` | The game rules, with no DOM, canvas or audio: which fingers are in, the decision timer, the pick (players or teams), locking, and color and tone assignment. The RNG and clock can be injected, so it's fully unit-tested. |
-| `mode.ts` | Pure mode rules: `{ kind: 'players' \| 'teams', count }`, the count range (players 1–`MAX_COUNT`, teams 2–`MAX_COUNT`), cycling, labels, how many fingers a pick needs, and validating a stored mode. |
-| `modeSelector.ts` | The capsule at the top (DOM). Tapping the number cycles it; tapping the word toggles players/teams. Remembers the mode in `localStorage` (`itpicksyou.mode`), hides while the round isn't idle, and only shows a mode once `Round.setMode` has accepted it. |
+| `round.ts` | The game rules, with no DOM, canvas or audio: which fingers are in, the decision timer, the pick (players, teams or rank), locking, and color and tone assignment. The RNG and clock can be injected, so it's fully unit-tested. |
+| `mode.ts` | Pure mode rules: `{ kind: 'players' \| 'teams' \| 'rank', count }`, shown as the modes Choose, Split and Rank (`modeName`). The count range (players 1–`MAX_COUNT`, teams 2–`MAX_COUNT`; Rank has no number but keeps `count` so it carries over), the knob order (`MODE_KINDS`, `nextKind`), labels, how many fingers a pick needs, and validating a stored mode. The kind names predate the mode names and are what `localStorage` holds, so don't rename them. |
+| `modeSelector.ts` | The selector at the top (DOM): a knob that turns 120° per tap through the modes, and a capsule to its right ("Choose [3] players", "Split [2] teams", "Rank all players") whose number cycles on tap. Changing mode animates the old capsule out (down, shrinking, fading; it stays in the DOM marked `leaving` until then) and the new one in from above, while the slot's width animates so the centered selector doesn't jump. Remembers the mode in `localStorage` (`itpicksyou.mode`), hides while the round isn't idle, and only shows a mode once `Round.setMode` has accepted it. |
 | `voronoi.ts` | Pure geometry: Voronoi cells as convex polygons (half-plane clipping), shrunk by an inset along shared edges, and a rounded-corner polygon path. |
 | `regions.ts` | Draws the result of a multi-player pick: each winner's Voronoi region in its color, with a gap (`BOUNDARY_WIDTH`) between regions, rounded corners (`CORNER_RADIUS`), and the color expanding out from the winner (`HALO_EXPAND_TIME`). Regions are computed over a rect bigger than the screen so only inner boundaries show. |
-| `state.ts` | The `Node` class, one per finger. It holds position, color, tone, and timestamps, and draws the ring (spinning arc that fills in, and a pulse that freezes at the pick). |
-| `draw.ts` | Pure canvas helper `drawNode` (disc plus arc ring). |
+| `state.ts` | The `Node` class, one per finger. It holds position, color, tone, rank and timestamps, and draws the ring (spinning arc that fills in, and a pulse that freezes at the pick). Once a ranked node's `selectedTime` passes it's drawn as a chip instead, with a one-off swell (`rankPulse`). |
+| `draw.ts` | Pure canvas helpers: `drawNode` (disc plus arc ring) and `drawChip` (a ranked finger as a poker chip: solid disc, inner ring, and the rank repeated `CHIP_LABEL_REPEATS` times round the edge, tops facing outward; dark text on light colors). |
 | `audio.ts` | Web Audio synth. It uses one lazily created `AudioContext` that feeds a master gain and then a compressor/limiter. `playTone` is the "finger down" blip and `playSelectedTone` is the winner and finger-up sound. Tones are picked from a fixed scale (`SCALE_SEMITONES`) relative to A440. |
-| `styles.css` | Styles for the info button and overlay only. |
+| `styles.css` | Styles for the splash page, the mode selector (knob and capsules), and the info button and overlay. |
 
 `public/` holds static assets that are copied as-is: the icons, the favicon, the GitHub mark used in the overlay, the splash images (see `npm run screenshots`), `robots.txt` and `sitemap.xml`. The PWA manifest is generated from the `manifest` block in `vite.config.ts`; there's no static manifest file. Its `id` is pinned to `/index.html`, the identity existing installs already have, so `start_url` can change without breaking them. `og-image.png` is left out of the service worker's precache.
 
@@ -43,15 +43,16 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 3. When the timer fires, the fingers are put in random order (`draw()`: each drawn uniformly from those left; a random source that always returns 0 keeps the original order, which the tests rely on). Then:
    - **players**: the first `count` win. Everyone else moves from `touches` to `lingering` and disappears. Winners are then sorted by tone index (lowest pitch first; `audio.test.ts` checks that tone index order is pitch order) and revealed one at a time: each winner's `selectedTime` is `now + i * PICK_STAGGER` (0.3 s). That timestamp drives both its note (`app.ts` schedules it) and its region's swell (`regions.ts` draws nothing for a winner before its `selectedTime`).
    - **teams**: everyone stays. Fingers are dealt into `count` teams in turn (sizes differ by at most one), and each team's nodes take a color from `TEAM_COLORS`, a distinct-looking subset of `COLOR_LIST`, in random order.
+   - **rank**: everyone stays and keeps their color. Each node gets `rank` (1 = first, in draw order) and is revealed from first place on, `PICK_STAGGER` apart, like players. At its reveal it plays its note, turns into a chip showing its rank, and swells by `RANK_PULSE_MAGNITUDE` (12%) and back over `RANK_PULSE_TIME` (300 ms, matching the stagger). A rank needs only 2 fingers, whatever `count` is.
    For teams every node's `selectedTime` is `now`. The round locks, `result` is set, and `onPick(result)` fires.
 4. While the round is locked, new touches are added to `lingering` and never become nodes. The round unlocks only once every touch has lifted, kept or not, and including any placed while locked.
 5. When a touch event reports `e.touches.length === 0`, `app.ts` calls `round.noTouchesRemaining()`. That resets any leftover state, so a touchend the browser never delivered can't leave the round stuck.
 
 `setMode` only works while the round is `idle` (no fingers down, not locked); the selector is hidden otherwise.
 
-`app.ts` draws `regions.ts` under the nodes when the result is `players` (one region per remaining winner, recomputed every frame so regions follow moving fingers; with one winner that's a full-screen halo). Teams have no background. Pick sounds: for players, each winner's own note at its reveal time (pending notes are skipped if the round has already reset); for teams, a single note (`TEAMS_PICK_TONE`). The ring radius is `min(width, height) / 8`.
+`app.ts` draws `regions.ts` under the nodes when the result is `players` (one region per remaining winner, recomputed every frame so regions follow moving fingers; with one winner that's a full-screen halo). Teams and rank have no background. Pick sounds: for players and rank, each node's own note at its reveal time (pending notes are skipped if the round has already reset); for teams, a single note (`TEAMS_PICK_TONE`). The ring radius is `min(width, height) / 8`.
 
-Timing constants: `WAIT_DECISION_TIME` and `PICK_STAGGER` in `round.ts`, tone durations in `app.ts`, ring animation in `state.ts`, region animation and styling in `regions.ts`.
+Timing constants: `WAIT_DECISION_TIME` and `PICK_STAGGER` in `round.ts`, tone durations in `app.ts`, ring and rank-pulse animation in `state.ts`, region animation and styling in `regions.ts`.
 
 ## Known issues and rough edges
 
@@ -67,7 +68,7 @@ Timing constants: `WAIT_DECISION_TIME` and `PICK_STAGGER` in `round.ts`, tone du
 - `mode.test.ts` covers the selector rules. `voronoi.test.ts` covers the cell geometry (areas, insets, containment). `state.test.ts` covers the arc and fill maths. `audio.test.ts` covers the frequency maths.
 - Keep new game logic in pure modules like `round.ts` rather than `app.ts`, so it can be tested without a browser.
 
-**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the splash page (`splash.spec.ts`), the mode selector, multi-player regions and team colors (`modes.spec.ts`), the info overlay, and the manifest and service worker.
+**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the splash page (`splash.spec.ts`), the mode selector, multi-player regions, team colors and ranking (`modes.spec.ts`), the info overlay, and the manifest and service worker.
 
 - Import `test`/`expect` from `e2e/fixtures.ts`, not `@playwright/test`. Its `test` marks the splash as seen so tests start in the app; use `test.use({ splash: true })` to test the splash.
 - Multi-touch: `e2e/touch.ts` has a `Fingers` helper built on CDP `Input.dispatchTouchEvent`, because Playwright's `touchscreen` only taps. `touchStart` sends every finger that's down; `touchEnd` lists the fingers being lifted. Don't release fingers by sending a `touchMove` without them: Chromium holds that touchend back until the next input event.

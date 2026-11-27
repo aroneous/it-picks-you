@@ -19,15 +19,17 @@ const round = new Round({
 
 /**
  * Players: each winner's own note, one after another (lowest first) in step with its
- * region appearing. Teams: one note.
+ * region appearing. Rank: each finger's note as its rank appears, first place first.
+ * Teams: one note.
  */
 function playPickSound(result: PickResult) {
     if (result.kind === 'teams') {
         playScaleSelectedTone(TEAMS_PICK_TONE, SELECTED_TONE_DURATION);
         return;
     }
-    result.winners.forEach((winner, i) => {
-        const play = () => playScaleSelectedTone(winner.toneIndex, SELECTED_TONE_DURATION);
+    const nodes = result.kind === 'players' ? result.winners : result.ranking;
+    nodes.forEach((node, i) => {
+        const play = () => playScaleSelectedTone(node.toneIndex, SELECTED_TONE_DURATION);
         if (i === 0) return play();
         // Skip notes still pending if everyone has already lifted and the round reset.
         setTimeout(() => round.result === result && play(), i * PICK_STAGGER);
@@ -141,8 +143,9 @@ export function initializeApp() {
           <p>The eternal question: who will go first in the game? This provides the answer!
           All players lay a finger on the screen, and wait a couple of seconds. Your fate will
           be determined.</p>
-          <p>Use the selector at the top to pick more than one player, or to split everyone
-          into teams. Tap the number to change it.</p>
+          <p>Turn the knob at the top to change what it does: <strong>Choose</strong> one or
+          more players, <strong>Split</strong> everyone into teams, or <strong>Rank</strong>
+          everyone in order. Tap the number to change it.</p>
 
           <h2>Isn't this just Chwazi but less full-featured?</h2>
           <p>...yes, but Chwazi went away, so now you have this.</p>

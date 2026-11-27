@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Node } from './state';
+import { Node, RANK_PULSE_MAGNITUDE, RANK_PULSE_TIME, rankPulse } from './state';
 
 const TAU = 2 * Math.PI;
 
@@ -26,5 +26,12 @@ describe('Node', () => {
   it('rotates the arc start once per rotation period', () => {
     expect(node.getArcStart(750)).toBeCloseTo(Math.PI);
     expect(node.getArcStart(1500)).toBeCloseTo(0);
+  });
+
+  it('pulses once when its rank appears, peaking halfway and back to normal by the end', () => {
+    expect(rankPulse(-1)).toBe(0);
+    expect(rankPulse(0)).toBe(0);
+    expect(rankPulse(RANK_PULSE_TIME / 2)).toBeCloseTo(RANK_PULSE_MAGNITUDE);
+    expect(rankPulse(RANK_PULSE_TIME)).toBe(0);
   });
 });

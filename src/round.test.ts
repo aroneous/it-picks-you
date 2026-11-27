@@ -293,6 +293,52 @@ describe('Round', () => {
     });
   });
 
+  describe('rank', () => {
+    it('ranks once there are two fingers', () => {
+      const { round, onPick } = makeRound({ mode: { kind: 'rank', count: 3 } });
+      round.touchStart(1, 0, 0);
+      vi.advanceTimersByTime(WAIT_DECISION_TIME * 2);
+      expect(onPick).not.toHaveBeenCalled();
+      round.touchStart(2, 0, 0);
+      vi.advanceTimersByTime(WAIT_DECISION_TIME);
+      expect(onPick).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps every finger and its color, and gives each a distinct rank from 1', () => {
+      const { round } = makeRound({ mode: { kind: 'rank', count: 1 }, random: () => 0.6 });
+      [1, 2, 3, 4, 5].forEach(id => round.touchStart(id, 0, 0));
+      const colorOf = (nodes: Node[]) => Object.fromEntries(nodes.map(n => [n.id, n.color]));
+      const colors = colorOf(round.nodes);
+      vi.advanceTimersByTime(WAIT_DECISION_TIME);
+      const result = round.result as Extract<PickResult, { kind: 'rank' }>;
+      expect(result.kind).toBe('rank');
+      expect(result.ranking.map(n => n.rank)).toEqual([1, 2, 3, 4, 5]);
+      expect(result.ranking.map(n => n.id).sort()).toEqual(['1', '2', '3', '4', '5']);
+      expect(round.nodes).toHaveLength(5);
+      expect(colorOf(round.nodes)).toEqual(colors);
+    });
+
+    it('reveals ranks from first place, PICK_STAGGER apart', () => {
+      // random = 0.99 draws the last finger each time, so the order is reversed.
+      const { round } = makeRound({ mode: { kind: 'rank', count: 1 }, random: () => 0.99, now: () => 1000 });
+      [1, 2, 3].forEach(id => round.touchStart(id, 0, 0));
+      vi.advanceTimersByTime(WAIT_DECISION_TIME);
+      const { ranking } = round.result as Extract<PickResult, { kind: 'rank' }>;
+      expect(ranking.map(n => n.id)).toEqual(['3', '2', '1']);
+      expect(ranking.map(n => n.selectedTime)).toEqual([1000, 1000 + PICK_STAGGER, 1000 + 2 * PICK_STAGGER]);
+    });
+
+    it('unlocks once everyone has lifted', () => {
+      const { round } = makeRound({ mode: { kind: 'rank', count: 1 } });
+      [1, 2].forEach(id => round.touchStart(id, 0, 0));
+      vi.advanceTimersByTime(WAIT_DECISION_TIME);
+      round.touchEnd(1);
+      expect(round.locked).toBe(true);
+      round.touchEnd(2);
+      expect(round.locked).toBe(false);
+    });
+  });
+
   describe('setMode', () => {
     it('applies while idle', () => {
       const { round } = makeRound();

@@ -9,12 +9,17 @@ export type PickResult =
    */
   | { kind: 'players'; winners: Node[] }
   /** Every finger, split into teams as evenly as possible. Each node takes its team's color. */
-  | { kind: 'teams'; teams: Node[][] };
+  | { kind: 'teams'; teams: Node[][] }
+  /**
+   * Every finger, in rank order (first place first). Each node's `rank` is set, and ranks
+   * are revealed one at a time from first place, `PICK_STAGGER` apart, by `selectedTime`.
+   */
+  | { kind: 'rank'; ranking: Node[] };
 
 /** How long fingers must stay still (no fingers added or lifted) before a pick. */
 export const WAIT_DECISION_TIME = 2000; // ms
 
-/** Time between revealing one winner and the next when picking several players. */
+/** Time between revealing one winner (or rank) and the next. */
 export const PICK_STAGGER = 300; // ms
 
 export const COLOR_LIST = [
@@ -185,7 +190,7 @@ export class Round {
       shown = order.slice(0, this._mode.count).sort((a, b) => a.toneIndex - b.toneIndex);
       shown.forEach((node, i) => (node.selectedTime = now + i * PICK_STAGGER));
       this._result = { kind: 'players', winners: shown };
-    } else {
+    } else if (this._mode.kind === 'teams') {
       const colors = this.draw(TEAM_COLORS);
       const teams: Node[][] = Array.from({ length: this._mode.count }, () => []);
       order.forEach((node, i) => teams[i % teams.length].push(node));
@@ -193,6 +198,13 @@ export class Round {
       shown = order;
       for (const node of shown) node.selectedTime = now;
       this._result = { kind: 'teams', teams };
+    } else {
+      shown = order;
+      shown.forEach((node, i) => {
+        node.rank = i + 1;
+        node.selectedTime = now + i * PICK_STAGGER;
+      });
+      this._result = { kind: 'rank', ranking: shown };
     }
     for (const [id, node] of this.touches) {
       if (!shown.includes(node)) {

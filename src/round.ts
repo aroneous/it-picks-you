@@ -9,12 +9,17 @@ export type PickResult =
    */
   | { kind: 'players'; winners: Node[] }
   /** Every finger, split into teams as evenly as possible. Each node takes its team's color. */
-  | { kind: 'teams'; teams: Node[][] };
+  | { kind: 'teams'; teams: Node[][] }
+  /**
+   * Every finger, in rank order (first place first). Each node's `rank` is set, and ranks
+   * are revealed one at a time from first place, `PICK_STAGGER` apart, by `selectedTime`.
+   */
+  | { kind: 'rank'; ranking: Node[] };
 
 /** How long fingers must stay still (no fingers added or lifted) before a pick. */
 export const WAIT_DECISION_TIME = 2000; // ms
 
-/** Time between revealing one winner and the next when picking several players. */
+/** Time between revealing one winner (or rank) and the next. */
 export const PICK_STAGGER = 300; // ms
 
 export const COLOR_LIST = [
@@ -28,6 +33,14 @@ export const COLOR_LIST = [
 export const TEAM_COLORS = ['red', 'blue', 'yellow', 'lime', 'magenta'];
 
 export const MAX_TONES = 10;
+
+/**
+ * After a rank, how long the chips stay on screen once every finger has lifted. Fingers
+ * cover the numbers, so people lift them to read the result.
+ */
+export const RANK_LINGER_TIME = 1000; // ms
+/** After the linger, the chips fade out over this long, then the round unlocks. */
+export const RANK_FADE_TIME = 250; // ms
 
 export interface RoundOptions {
   /** Called when a finger joins the round. */
@@ -51,7 +64,9 @@ export interface RoundOptions {
  * Lifecycle: fingers are placed → once there are more fingers than the mode's
  * count and nothing has changed for `decisionTime`, the pick is made and the
  * round locks → the round unlocks only after *every* finger (picked or not, and
- * any placed while locked) has been lifted.
+ * any placed while locked) has been lifted. After a rank, lifted fingers stay on
+ * screen, and fade out `RANK_LINGER_TIME` after the last one lifts; the round
+ * unlocks once they've faded (`RANK_FADE_TIME`).
  */
 export class Round {
   /** Nodes currently drawn on screen. */
@@ -65,6 +80,8 @@ export class Round {
   private _locked = false;
   private _result: PickResult | null = null;
   private _mode: Mode;
+  /** When the rank's chips start fading out, once everyone has lifted; otherwise null. */
+  private fadeStart: number | null = null;
 
   private readonly opts: RoundOptions;
   private readonly random: () => number;
@@ -97,6 +114,12 @@ export class Round {
     return !this._locked && this.touches.size === 0 && this.lingering.size === 0;
   }
 
+  /** How opaque to draw the nodes at `now`: 1, except while a rank's chips fade out. */
+  opacityAt(now: number): number {
+    if (this.fadeStart === null) return 1;
+    return Math.min(1, Math.max(0, 1 - (now - this.fadeStart) / RANK_FADE_TIME));
+  }
+
   /** Changes the mode. Only allowed while idle; returns whether it took effect. */
   setMode(mode: Mode): boolean {
     if (!this.idle) return false;
@@ -107,6 +130,9 @@ export class Round {
   touchStart(id: number, x: number, y: number): void {
     if (this._locked) {
       this.lingering.add(id);
+      // A touch during the rank's linger holds it (and brings faded chips back) until lifted.
+      this.clearTimer();
+      this.fadeStart = null;
       return;
     }
     if (this.touches.has(id)) return;
@@ -130,11 +156,12 @@ export class Round {
     const node = this.touches.get(id);
     if (node) {
       this.touches.delete(id);
-      this.removeNode(node);
+      // Ranked fingers stay on screen after lifting, so the numbers can be read.
+      if (this._result?.kind !== 'rank') this.removeNode(node);
       if (!this._locked) this.opts.onLift?.(node);
     }
     if (this._locked) {
-      if (this.touches.size === 0 && this.lingering.size === 0) this.reset();
+      if (this.touches.size === 0 && this.lingering.size === 0) this.allLifted();
     } else {
       this.updateTimer();
     }
@@ -146,7 +173,19 @@ export class Round {
    * touchend can't leave the round stuck.
    */
   noTouchesRemaining(): void {
-    if (this.touches.size > 0 || this.lingering.size > 0 || this._locked) this.reset();
+    if (this._locked) this.allLifted();
+    else if (this.touches.size > 0 || this.lingering.size > 0) this.reset();
+  }
+
+  /** Every finger is off a locked round: unlock now, or after a rank's linger. */
+  private allLifted(): void {
+    if (this._result?.kind !== 'rank') return this.reset();
+    this.touches.clear();
+    this.lingering.clear();
+    if (this.timer === null) {
+      this.fadeStart = this.now() + RANK_LINGER_TIME;
+      this.timer = setTimeout(() => this.reset(), RANK_LINGER_TIME + RANK_FADE_TIME);
+    }
   }
 
   private reset(): void {
@@ -156,6 +195,7 @@ export class Round {
     this.nodes.length = 0;
     this._locked = false;
     this._result = null;
+    this.fadeStart = null;
   }
 
   private updateTimer(): void {
@@ -185,7 +225,7 @@ export class Round {
       shown = order.slice(0, this._mode.count).sort((a, b) => a.toneIndex - b.toneIndex);
       shown.forEach((node, i) => (node.selectedTime = now + i * PICK_STAGGER));
       this._result = { kind: 'players', winners: shown };
-    } else {
+    } else if (this._mode.kind === 'teams') {
       const colors = this.draw(TEAM_COLORS);
       const teams: Node[][] = Array.from({ length: this._mode.count }, () => []);
       order.forEach((node, i) => teams[i % teams.length].push(node));
@@ -193,6 +233,13 @@ export class Round {
       shown = order;
       for (const node of shown) node.selectedTime = now;
       this._result = { kind: 'teams', teams };
+    } else {
+      shown = order;
+      shown.forEach((node, i) => {
+        node.rank = i + 1;
+        node.selectedTime = now + i * PICK_STAGGER;
+      });
+      this._result = { kind: 'rank', ranking: shown };
     }
     for (const [id, node] of this.touches) {
       if (!shown.includes(node)) {

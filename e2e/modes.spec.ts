@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { alphaAt, deterministic, Fingers, nextFrames, rgbaAt } from './touch';
 
@@ -15,30 +16,59 @@ const BLUE = [0, 0, 255, 255];
 const GREEN = [0, 128, 0, 255];
 
 test.describe('mode selector', () => {
-  test('starts at 1 player, cycles the number and switches to teams', async ({ page }) => {
+  // While a capsule animates out it stays in the DOM, marked `leaving`.
+  const capsule = (page: Page) => page.locator('.mode-capsule:not(.leaving)');
+
+  test('starts at Choose 1 player, cycles the number, and the knob turns through the modes', async ({ page }) => {
     await page.goto('/');
-    const count = page.locator('.mode-count');
-    const kind = page.locator('.mode-kind');
-    await expect(count).toHaveText('1');
-    await expect(kind).toHaveText('player');
+    const count = capsule(page).locator('.mode-count');
+    const kind = capsule(page).locator('.mode-kind');
+    await expect(capsule(page)).toHaveText(/Choose\s*1\s*player$/);
 
     await count.click();
     await expect(count).toHaveText('2');
     await expect(kind).toHaveText('players');
 
     await count.click();
-    await kind.click();
-    await expect(count).toHaveText('3');
-    await expect(kind).toHaveText('teams');
+    await page.locator('.mode-knob').click();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
+
+    await page.locator('.mode-knob').click();
+    await expect(capsule(page)).toHaveText(/Rank\s*all players/);
+    await expect(count).toHaveCount(0);
+
+    await page.locator('.mode-knob').click();
+    await expect(capsule(page)).toHaveText(/Choose\s*3\s*players/);
+    // The old capsules have animated away.
+    await expect(page.locator('.mode-capsule')).toHaveCount(1);
   });
 
   test('remembers the mode across reloads', async ({ page }) => {
     await page.goto('/');
-    await page.locator('.mode-kind').click();
-    await expect(page.locator('.mode-count')).toHaveText('2');
+    await page.locator('.mode-knob').click();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
     await page.reload();
-    await expect(page.locator('.mode-count')).toHaveText('2');
-    await expect(page.locator('.mode-kind')).toHaveText('teams');
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
+  });
+
+  test('Choose and Split keep their own numbers', async ({ page }) => {
+    await page.goto('/');
+    const knob = page.locator('.mode-knob');
+    const count = capsule(page).locator('.mode-count');
+    await count.click();
+    await count.click();
+    await expect(capsule(page)).toHaveText(/Choose\s*3\s*players/);
+    await knob.click();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
+    await count.click();
+    await count.click();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*4\s*teams/);
+    await knob.click();
+    await knob.click();
+    await expect(capsule(page)).toHaveText(/Choose\s*3\s*players/);
+    await page.reload();
+    await knob.click();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*4\s*teams/);
   });
 
   test('hides while fingers are on the screen', async ({ page }) => {
@@ -95,4 +125,50 @@ test('teams: every finger stays and takes its team color, with no background', a
   await expect(page.locator('.mode-selector')).toHaveClass(/hidden/);
   await fingers.liftAll();
   await expect(page.locator('.mode-selector')).not.toHaveClass(/hidden/);
+});
+
+test('rank: every finger stays in its color and is ranked in turn from first place', async ({ page }) => {
+  await deterministic(page, { kind: 'rank', count: 1 });
+  await page.goto('/');
+  const fingers = await Fingers.attach(page);
+  await fingers.place(A, B, C);
+
+  // A point in the gap between a finger's disc and its ring (radius = 400 / 8 = 50), which a
+  // ranked finger's chip fills in.
+  const gap = (f: { x: number; y: number }) => alphaAt(page, f.x + 35, f.y);
+  await nextFrames(page);
+  expect(await gap(A)).toBe(0);
+
+  // With random = 0 the ranking is placement order: A first, then B 0.3 s later, then C.
+  await expect.poll(() => gap(A), { timeout: PICK_TIMEOUT, intervals: [20] }).toBe(255);
+  expect(await gap(B)).toBe(0);
+  await expect.poll(() => gap(B), { timeout: 2000, intervals: [20] }).toBe(255);
+  expect(await gap(C)).toBe(0);
+  await expect.poll(() => gap(C), { timeout: 2000 }).toBe(255);
+  await nextFrames(page);
+
+  // Colors are kept, and there's no background.
+  expect(await rgbaAt(page, A.x, A.y)).toEqual(RED);
+  expect(await rgbaAt(page, B.x, B.y)).toEqual(BLUE);
+  expect(await rgbaAt(page, C.x, C.y)).toEqual(GREEN);
+  expect(await alphaAt(page, CORNER.x, CORNER.y)).toBe(0);
+
+  // The chips stay up for RANK_LINGER_TIME (1 s) after the last finger lifts.
+  await fingers.liftAll();
+  await nextFrames(page);
+  expect(await rgbaAt(page, A.x, A.y)).toEqual(RED);
+  await expect(page.locator('.mode-selector')).toHaveClass(/hidden/);
+  await expect.poll(() => alphaAt(page, A.x, A.y), { timeout: 3000 }).toBe(0);
+  await expect(page.locator('.mode-selector')).not.toHaveClass(/hidden/);
+});
+
+test('the knob stays put when the mode changes', async ({ page }) => {
+  await page.goto('/');
+  const knob = page.locator('.mode-knob');
+  const before = await knob.boundingBox();
+  for (let i = 0; i < 3; i++) {
+    await knob.click();
+    await expect(knob).toHaveCount(1);
+    expect(await knob.boundingBox()).toEqual(before);
+  }
 });

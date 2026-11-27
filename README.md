@@ -8,7 +8,7 @@ The name? There are inevitably accusations of cheating by some sore loser of the
 ## Usage
 For use on touch-enabled devices. Everybody put a finger on the screen, and wait a couple of seconds. Your fate will be determined.
 
-Use the selector at the top of the screen to pick more than one player (the screen is split between the winners), or to split everyone into teams (each finger takes its team's colour). Tap the number to change it, and tap the word to switch between players and teams.
+Use the selector at the top of the screen to pick more than one player (the screen is split between the winners), or to split everyone into teams (each finger takes its team's color). Tap the number to change it, and tap the word to switch between players and teams.
 
 ## Feature Requests
 Want something else? Let me know!

@@ -22,6 +22,10 @@ export default defineConfig(({ command, isPreview }) => ({
         theme_color: '#1e1f25',
         background_color: '#1e1f25',
         display: 'standalone',
+        // `id` is the installed app's identity. Without it Chrome derives it from start_url,
+        // which for existing installs is /index.html, so pin it to that: start_url can then
+        // change without installs being treated as a different app.
+        id: '/index.html',
         start_url: 'index.html',
         icons: [
           {
@@ -46,6 +50,8 @@ export default defineConfig(({ command, isPreview }) => ({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Only for link previews; installed apps never need it offline.
+        globIgnores: ['og-image.png'],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'document' || request.destination === 'script' || request.destination === 'style' || request.destination === 'image' || request.destination === 'font',

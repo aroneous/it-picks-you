@@ -2,14 +2,86 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>It Picks You</title>
-  <link rel="stylesheet" href="/src/styles.css">
-  <meta name="theme-color" content="#1e1f25">
+  <title>It Always Picks You: who goes first? A fair start-player picker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The fair start-player app">
+  <meta name="theme-color" content="#1e1f25">
+  <meta name="description" content="Who goes first? Everyone put a finger on the screen, wait a moment, and it picks. Pick several players or split into teams. Free, no ads, no sign-up, and it works offline.">
+  <link rel="canonical" href="https://itpicksyou.wily.cc/">
   <link rel="apple-touch-icon" href="/icon-192.png" sizes="192x192">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://itpicksyou.wily.cc/">
+  <meta property="og:title" content="It Always Picks You: who goes first?">
+  <meta property="og:description" content="Everyone put a finger on the screen, wait a moment, and it picks who goes first. Pick several players or split into teams.">
+  <meta property="og:image" content="https://itpicksyou.wily.cc/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "It Always Picks You",
+    "url": "https://itpicksyou.wily.cc/",
+    "description": "A fair start-player picker. Everyone put a finger on the screen, wait a moment, and it picks who goes first. It can also pick several players or split everyone into teams.",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Any (touch screen)",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+
+  <!--
+    Decide whether to show the splash before anything is drawn. It's hidden when running
+    as an installed app, or once this browser has tapped Start. Must stay inline in <head>
+    so the splash never flashes up; see src/splash.ts for the rest.
+  -->
+  <script>
+    (function () {
+      var installed = ['standalone', 'fullscreen', 'minimal-ui'].some(function (m) {
+        return window.matchMedia && window.matchMedia('(display-mode: ' + m + ')').matches;
+      }) || window.navigator.standalone === true;
+      var seen = false;
+      try { seen = localStorage.getItem('itpicksyou.splashSeen') === '1'; } catch (e) {}
+      if (installed || seen) document.documentElement.classList.add('no-splash');
+    })();
+  </script>
+
+  <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
+  <main id="splash" class="splash" aria-labelledby="splash-title">
+    <div class="splash-inner">
+      <section class="splash-text">
+        <h1 id="splash-title">
+          <span class="splash-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          &ldquo;It Always Picks&nbsp;You&rdquo;
+        </h1>
+        <p class="splash-lede">Who goes first? Everyone put a finger on the screen, wait a moment, and it picks.</p>
+        <ul class="splash-points">
+          <li><strong>Pick a start player</strong> for any board or card game.</li>
+          <li><strong>Pick several players</strong>, and the screen splits between the winners.</li>
+          <li><strong>Split into teams</strong>, with every finger taking its team's color.</li>
+        </ul>
+        <p class="splash-small">Free, no ads, no sign-up, and it works offline. Made for phones and tablets.</p>
+        <button type="button" class="splash-start" id="splash-start">Start</button>
+        <details class="splash-install">
+          <summary>Add it to your home screen</summary>
+          <p><strong>iPhone and iPad:</strong> tap Share, then <em>Add to Home Screen</em>.<br>
+          <strong>Android:</strong> open the browser menu, then <em>Install app</em> or <em>Add to Home screen</em>.</p>
+        </details>
+      </section>
+      <figure class="splash-phone">
+        <div class="phone">
+          <img src="/screenshot-3-players.png" width="390" height="844"
+               alt="It Always Picks You after picking three players: the screen is split into orange, cyan and magenta regions, one around each winner's finger.">
+        </div>
+      </figure>
+    </div>
+    <footer class="splash-footer">
+      <a href="https://github.com/aroneous/it-picks-you" rel="noopener">Source on GitHub</a>
+    </footer>
+  </main>
   <script type="module" src="/src/index.ts"></script>
 </body>
 </html>

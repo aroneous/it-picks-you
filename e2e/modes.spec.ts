@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { alphaAt, deterministic, Fingers, nextFrames, rgbaAt } from './touch';
 
 const PICK_TIMEOUT = 2000 + 500 + 2000; // WAIT_DECISION_TIME + HALO_EXPAND_TIME + slack
@@ -8,7 +8,7 @@ const B = { id: 2, x: 300, y: 600 };
 const C = { id: 3, x: 300, y: 200 };
 const CORNER = { x: 5, y: 795 };
 
-// The first entries of COLOR_LIST (finger colours) and TEAM_COLORS, which `deterministic`
+// The first entries of COLOR_LIST (finger colors) and TEAM_COLORS, which `deterministic`
 // makes the assignment order.
 const RED = [255, 0, 0, 255];
 const BLUE = [0, 0, 255, 255];
@@ -74,7 +74,7 @@ test('two players: each winner gets a region, with a gap along the boundary', as
   expect(await alphaAt(page, (A.x + B.x) / 2, (A.y + B.y) / 2)).toBe(0);
 });
 
-test('teams: every finger stays and takes its team colour, with no background', async ({ page }) => {
+test('teams: every finger stays and takes its team color, with no background', async ({ page }) => {
   await deterministic(page, { kind: 'teams', count: 2 });
   await page.goto('/');
   const fingers = await Fingers.attach(page);

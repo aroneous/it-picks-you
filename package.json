@@ -7,18 +7,18 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest"
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "author": "Aroneous",
   "license": "ISC",
   "type": "module",
-  "dependencies": {
+  "devDependencies": {
     "typescript": "^5.9.2",
     "vite": "^7.1.4",
-    "vitest": "^3.2.4"
-  },
-  "devDependencies": {
     "vite-plugin-mkcert": "^1.17.8",
-    "vite-plugin-pwa": "^1.0.3"
+    "vite-plugin-pwa": "^1.0.3",
+    "vitest": "^3.2.4"
   }
 }

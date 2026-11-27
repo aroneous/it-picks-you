@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test, build and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      # Deploys are skipped until the repository variable CLOUDFLARE_PAGES_PROJECT is set
+      # (Settings → Secrets and variables → Actions → Variables). Pushes to main go to
+      # production; pull requests from this repo (not forks) get a preview URL.
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        if: >-
+          vars.CLOUDFLARE_PAGES_PROJECT != '' &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: >-
+            pages deploy dist
+            --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+            --branch=${{ github.head_ref || github.ref_name }}
+            --commit-hash=${{ github.sha }}
+
+      - name: Report deployment URL
+        if: steps.deploy.outcome == 'success'
+        run: |
+          echo "### Deployed to Cloudflare Pages" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment: ${{ steps.deploy.outputs.deployment-url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch alias: ${{ steps.deploy.outputs.pages-deployment-alias-url }}" >> "$GITHUB_STEP_SUMMARY"

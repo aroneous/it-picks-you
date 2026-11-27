@@ -23,15 +23,25 @@ export class Node implements NodeState {
   color: string;
   x: number;
   y: number;
+  /** Index into the audio scale; used for this finger's place, lift and win sounds. */
+  toneIndex: number;
   placedTime: DOMHighResTimeStamp;
   selectedTime: DOMHighResTimeStamp | undefined = undefined;
 
-  constructor(id: string, color: string, x: number, y: number) {
+  constructor(
+    id: string,
+    color: string,
+    x: number,
+    y: number,
+    toneIndex = 0,
+    placedTime: DOMHighResTimeStamp = performance.now()
+  ) {
     this.id = id;
     this.color = color;
     this.x = x;
     this.y = y;
-    this.placedTime = performance.now();
+    this.toneIndex = toneIndex;
+    this.placedTime = placedTime;
   }
   
   getArcStart(elapsed: number): number {

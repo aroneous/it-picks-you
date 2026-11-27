@@ -19,9 +19,15 @@ cd it-picks-you
 
 # Install dependencies
 npm install
-# Run vite in dev mode
+# Run vite in dev mode (HTTPS on your LAN, so you can test on a phone)
 npm run dev
+
+# Run the tests / build for production
+npm test
+npm run build
 ```
+
+Every push and pull request is tested and built by GitHub Actions. Pushes to `main` deploy to Cloudflare Pages, and pull requests get a preview deployment. See [CLAUDE.md](CLAUDE.md) for architecture and deployment notes.
 
 ## License
 [MIT](https://opensource.org/license/mit)

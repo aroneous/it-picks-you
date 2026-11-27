@@ -8,7 +8,7 @@ export type PickResult =
    * winner's `selectedTime` is its reveal time, which drives both its sound and its region.
    */
   | { kind: 'players'; winners: Node[] }
-  /** Every finger, split into teams as evenly as possible. Each node takes its team's colour. */
+  /** Every finger, split into teams as evenly as possible. Each node takes its team's color. */
   | { kind: 'teams'; teams: Node[][] };
 
 /** How long fingers must stay still (no fingers added or lifted) before a pick. */
@@ -22,7 +22,7 @@ export const COLOR_LIST = [
 ];
 
 /**
- * Team colours: a subset of COLOR_LIST chosen to be easy to tell apart (no red/orange,
+ * Team colors: a subset of COLOR_LIST chosen to be easy to tell apart (no red/orange,
  * green/lime or magenta/pink pairs). Needs at least MAX_COUNT entries.
  */
 export const TEAM_COLORS = ['red', 'blue', 'yellow', 'lime', 'magenta'];
@@ -224,7 +224,7 @@ export class Round {
     if (idx !== -1) this.nodes.splice(idx, 1);
   }
 
-  /** A colour not used by any node on screen, starting from a random point in the list. */
+  /** A color not used by any node on screen, starting from a random point in the list. */
   private pickColor(): string {
     const used = new Set(this.nodes.map(n => n.color));
     const start = Math.floor(this.random() * COLOR_LIST.length);

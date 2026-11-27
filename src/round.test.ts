@@ -166,11 +166,11 @@ describe('Round', () => {
     expect(round.nodes[0]).toMatchObject({ x: 30, y: 40 });
   });
 
-  it('gives each finger a distinct colour while colours remain', () => {
+  it('gives each finger a distinct color while colors remain', () => {
     const { round } = makeRound({ random: () => 0.5 });
     COLOR_LIST.forEach((_, i) => round.touchStart(i, 0, 0));
     expect(new Set(round.nodes.map(n => n.color)).size).toBe(COLOR_LIST.length);
-    round.touchStart(100, 0, 0); // more fingers than colours still works
+    round.touchStart(100, 0, 0); // more fingers than colors still works
     expect(round.nodes).toHaveLength(COLOR_LIST.length + 1);
   });
 
@@ -254,7 +254,7 @@ describe('Round', () => {
       expect(round.nodes).toHaveLength(7);
     });
 
-    it('gives each team one colour, different from the other teams', () => {
+    it('gives each team one color, different from the other teams', () => {
       const { round } = makeRound({ mode: { kind: 'teams', count: 2 }, random: () => 0.3 });
       [1, 2, 3, 4, 5].forEach(id => round.touchStart(id, 0, 0));
       vi.advanceTimersByTime(WAIT_DECISION_TIME);
@@ -313,7 +313,7 @@ describe('Round', () => {
     });
   });
 
-  it('has enough team colours for the largest team count', () => {
+  it('has enough team colors for the largest team count', () => {
     expect(new Set(TEAM_COLORS).size).toBeGreaterThanOrEqual(MAX_COUNT);
     expect(TEAM_COLORS.every(c => COLOR_LIST.includes(c))).toBe(true);
   });

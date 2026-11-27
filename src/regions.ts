@@ -1,7 +1,7 @@
 import type { Node } from "./state";
 import { roundedPolygonPath, voronoiCells } from "./voronoi";
 
-/** How long each winner's colour takes to expand out to fill its region. */
+/** How long each winner's color takes to expand out to fill its region. */
 export const HALO_EXPAND_TIME = 500; // ms
 /** Width of the gap left between neighbouring regions. */
 export const BOUNDARY_WIDTH = 4; // px
@@ -17,8 +17,8 @@ const OFFSCREEN_MARGIN = 40; // px
 
 /**
  * Fills the screen with one region per winner: the area closer to that winner than to
- * any other (a Voronoi diagram), in the winner's colour. Neighbouring regions are
- * separated by a thin gap and have slightly rounded corners. Each region's colour
+ * any other (a Voronoi diagram), in the winner's color. Neighbouring regions are
+ * separated by a thin gap and have slightly rounded corners. Each region's color
  * expands outwards from its winner when the pick is made.
  */
 export function drawRegions(

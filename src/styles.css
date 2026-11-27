@@ -224,6 +224,7 @@
 	line-height: 1.05;
 	letter-spacing: -0.02em;
 	color: #fff;
+	text-wrap: balance;
 }
 .splash-dots {
 	display: flex;

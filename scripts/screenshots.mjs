@@ -21,7 +21,7 @@ try {
   await page.addInitScript(() => {
     localStorage.setItem('itpicksyou.splashSeen', '1');
     localStorage.setItem('itpicksyou.mode', JSON.stringify({ kind: 'players', count: 3 }));
-    // Math.random calls, in order: one colour per finger placed (index into COLOR_LIST
+    // Math.random calls, in order: one color per finger placed (index into COLOR_LIST
     // = floor(r * 10): 3 orange, 5 cyan, 6 magenta, 1 blue), then the draw at the pick
     // (0 = in placement order, so the first three fingers win and blue loses).
     const seq = [0.35, 0.55, 0.65, 0.15, 0, 0, 0, 0];

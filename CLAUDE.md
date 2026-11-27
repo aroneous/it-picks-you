@@ -12,7 +12,7 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 - `npm run typecheck`: `tsc` on its own. Test files, `e2e/` and `playwright.config.ts` are type-checked too. TypeScript 7 removed `moduleResolution: node`, so the project uses `Bundler`. It also no longer picks up `@types/*` packages automatically: `tsconfig.json` lists `types: ["node"]`, which Playwright's config needs for `process`.
 - `npm test`: runs the Vitest suite once. `npm run test:watch` runs it in watch mode.
 - `npm run test:e2e`: builds, then runs the Playwright E2E tests against `vite preview`. Run `npx playwright install chromium` once first. After a build, `npx playwright test` skips rebuilding.
-- `npm run screenshots`: regenerates the splash page images in `public/` from the production build: `screenshot-3-players.png` (a scripted 3-player pick with fixed finger positions and colours) and `og-image.png` (the splash at 1200×630, for link previews). Rerun and commit them after visual changes.
+- `npm run screenshots`: regenerates the splash page images in `public/` from the production build: `screenshot-3-players.png` (a scripted 3-player pick with fixed finger positions and colors) and `og-image.png` (the splash at 1200×630, for link previews). Rerun and commit them after visual changes.
 
 ## Source layout (`src/`)
 
@@ -22,12 +22,12 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 | `splash.ts` | The splash's Start button (sets the seen flag, unlocks audio, fades out) and `showSplash()`, used by "About & install" in the info overlay. |
 | `index.ts` | Entry point. On `DOMContentLoaded` it checks for touch support (shows a "needs touch" message if there isn't any, but still starts the app) and calls `initializeApp()`. |
 | `app.ts` | The browser side: creates the canvas, forwards touch events to a `Round`, plays sounds from the `Round` callbacks, runs the render loop, and builds the info button and overlay. |
-| `round.ts` | The game rules, with no DOM, canvas or audio: which fingers are in, the decision timer, the pick (players or teams), locking, and colour and tone assignment. The RNG and clock can be injected, so it's fully unit-tested. |
+| `round.ts` | The game rules, with no DOM, canvas or audio: which fingers are in, the decision timer, the pick (players or teams), locking, and color and tone assignment. The RNG and clock can be injected, so it's fully unit-tested. |
 | `mode.ts` | Pure mode rules: `{ kind: 'players' \| 'teams', count }`, the count range (players 1–`MAX_COUNT`, teams 2–`MAX_COUNT`), cycling, labels, how many fingers a pick needs, and validating a stored mode. |
 | `modeSelector.ts` | The capsule at the top (DOM). Tapping the number cycles it; tapping the word toggles players/teams. Remembers the mode in `localStorage` (`itpicksyou.mode`), hides while the round isn't idle, and only shows a mode once `Round.setMode` has accepted it. |
 | `voronoi.ts` | Pure geometry: Voronoi cells as convex polygons (half-plane clipping), shrunk by an inset along shared edges, and a rounded-corner polygon path. |
-| `regions.ts` | Draws the result of a multi-player pick: each winner's Voronoi region in its colour, with a gap (`BOUNDARY_WIDTH`) between regions, rounded corners (`CORNER_RADIUS`), and the colour expanding out from the winner (`HALO_EXPAND_TIME`). Regions are computed over a rect bigger than the screen so only inner boundaries show. |
-| `state.ts` | The `Node` class, one per finger. It holds position, colour, tone, and timestamps, and draws the ring (spinning arc that fills in, and a pulse that freezes at the pick). |
+| `regions.ts` | Draws the result of a multi-player pick: each winner's Voronoi region in its color, with a gap (`BOUNDARY_WIDTH`) between regions, rounded corners (`CORNER_RADIUS`), and the color expanding out from the winner (`HALO_EXPAND_TIME`). Regions are computed over a rect bigger than the screen so only inner boundaries show. |
+| `state.ts` | The `Node` class, one per finger. It holds position, color, tone, and timestamps, and draws the ring (spinning arc that fills in, and a pulse that freezes at the pick). |
 | `draw.ts` | Pure canvas helper `drawNode` (disc plus arc ring). |
 | `audio.ts` | Web Audio synth. It uses one lazily created `AudioContext` that feeds a master gain and then a compressor/limiter. `playTone` is the "finger down" blip and `playSelectedTone` is the winner and finger-up sound. Tones are picked from a fixed scale (`SCALE_SEMITONES`) relative to A440. |
 | `styles.css` | Styles for the info button and overlay only. |
@@ -38,11 +38,11 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 
 ## How a round works (`round.ts`)
 
-1. `touchStart`: if the round isn't locked, each new touch gets a `Node` with a colour (unique among nodes on screen where possible) and a tone index (lowest free, up to `MAX_TONES`), and `onPlace` fires. `app.ts` calls `resumeAudioContext()` on every touchstart, because the browser autoplay policy requires a user gesture.
+1. `touchStart`: if the round isn't locked, each new touch gets a `Node` with a color (unique among nodes on screen where possible) and a tone index (lowest free, up to `MAX_TONES`), and `onPlace` fires. `app.ts` calls `resumeAudioContext()` on every touchstart, because the browser autoplay policy requires a user gesture.
 2. Every time a finger is added or lifted, the 2 s timer (`WAIT_DECISION_TIME`) restarts as long as there are more fingers than the mode's count (`fingersNeeded`: 2 for one player, 4 for three teams). With fewer it's cancelled. A lift before the pick fires `onLift`.
 3. When the timer fires, the fingers are put in random order (`draw()`: each drawn uniformly from those left; a random source that always returns 0 keeps the original order, which the tests rely on). Then:
    - **players**: the first `count` win. Everyone else moves from `touches` to `lingering` and disappears. Winners are then sorted by tone index (lowest pitch first; `audio.test.ts` checks that tone index order is pitch order) and revealed one at a time: each winner's `selectedTime` is `now + i * PICK_STAGGER` (0.3 s). That timestamp drives both its note (`app.ts` schedules it) and its region's swell (`regions.ts` draws nothing for a winner before its `selectedTime`).
-   - **teams**: everyone stays. Fingers are dealt into `count` teams in turn (sizes differ by at most one), and each team's nodes take a colour from `TEAM_COLORS`, a distinct-looking subset of `COLOR_LIST`, in random order.
+   - **teams**: everyone stays. Fingers are dealt into `count` teams in turn (sizes differ by at most one), and each team's nodes take a color from `TEAM_COLORS`, a distinct-looking subset of `COLOR_LIST`, in random order.
    For teams every node's `selectedTime` is `now`. The round locks, `result` is set, and `onPick(result)` fires.
 4. While the round is locked, new touches are added to `lingering` and never become nodes. The round unlocks only once every touch has lifted, kept or not, and including any placed while locked.
 5. When a touch event reports `e.touches.length === 0`, `app.ts` calls `round.noTouchesRemaining()`. That resets any leftover state, so a touchend the browser never delivered can't leave the round stuck.
@@ -67,12 +67,12 @@ Timing constants: `WAIT_DECISION_TIME` and `PICK_STAGGER` in `round.ts`, tone du
 - `mode.test.ts` covers the selector rules. `voronoi.test.ts` covers the cell geometry (areas, insets, containment). `state.test.ts` covers the arc and fill maths. `audio.test.ts` covers the frequency maths.
 - Keep new game logic in pure modules like `round.ts` rather than `app.ts`, so it can be tested without a browser.
 
-**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the splash page (`splash.spec.ts`), the mode selector, multi-player regions and team colours (`modes.spec.ts`), the info overlay, and the manifest and service worker.
+**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the splash page (`splash.spec.ts`), the mode selector, multi-player regions and team colors (`modes.spec.ts`), the info overlay, and the manifest and service worker.
 
 - Import `test`/`expect` from `e2e/fixtures.ts`, not `@playwright/test`. Its `test` marks the splash as seen so tests start in the app; use `test.use({ splash: true })` to test the splash.
 - Multi-touch: `e2e/touch.ts` has a `Fingers` helper built on CDP `Input.dispatchTouchEvent`, because Playwright's `touchscreen` only taps. `touchStart` sends every finger that's down; `touchEnd` lists the fingers being lifted. Don't release fingers by sending a `touchMove` without them: Chromium holds that touchend back until the next input event.
 - Assertions read canvas pixels with `alphaAt(x, y)`: alpha 0 means nothing is drawn there. The background is a CSS gradient, not drawn on the canvas. A ring is opaque at its finger's position, and after a pick the winner's halo fills the screen, so a corner pixel becomes opaque.
-- To make a test deterministic, call `deterministic(page, mode?)` from `e2e/touch.ts` before `page.goto` (or before a reload). It makes `Math.random` return 0, so the first fingers win, colours come in `COLOR_LIST`/`TEAM_COLORS` order, and teams are dealt in turn. It can also store a mode. `Round` keeps its own reference to `Math.random` when it's created, so overriding it after the page loads has no effect. `rgbaAt` reads a pixel's colour for checks like "this finger turned red".
+- To make a test deterministic, call `deterministic(page, mode?)` from `e2e/touch.ts` before `page.goto` (or before a reload). It makes `Math.random` return 0, so the first fingers win, colors come in `COLOR_LIST`/`TEAM_COLORS` order, and teams are dealt in turn. It can also store a mode. `Round` keeps its own reference to `Math.random` when it's created, so overriding it after the page loads has no effect. `rgbaAt` reads a pixel's color for checks like "this finger turned red".
 - Wait for state changes with `expect.poll(...)`, not fixed timeouts, except when checking that something *doesn't* happen.
 
 ## CI/CD

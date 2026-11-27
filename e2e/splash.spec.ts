@@ -23,7 +23,7 @@ test('shows on the first visit in a browser, and Start goes to the app', async (
   await page.goto('/');
   const splash = page.locator('#splash');
   await expect(splash).toBeVisible();
-  await expect(page.getByRole('heading', { level: 1, name: 'It Picks You' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '“It Always Picks You”' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(splash).toBeHidden();

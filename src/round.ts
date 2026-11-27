@@ -1,4 +1,11 @@
+import { DEFAULT_MODE, fingersNeeded, Mode } from "./mode";
 import { Node } from "./state";
+
+export type PickResult =
+  /** The chosen players. Everyone else is removed from the screen. */
+  | { kind: 'players'; winners: Node[] }
+  /** Every finger, split into teams as evenly as possible. Each node takes its team's colour. */
+  | { kind: 'teams'; teams: Node[][] };
 
 /** How long fingers must stay still (no fingers added or lifted) before a pick. */
 export const WAIT_DECISION_TIME = 2000; // ms
@@ -7,6 +14,12 @@ export const COLOR_LIST = [
   'red', 'blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink'
 ];
 
+/**
+ * Team colours: a subset of COLOR_LIST chosen to be easy to tell apart (no red/orange,
+ * green/lime or magenta/pink pairs). Needs at least MAX_COUNT entries.
+ */
+export const TEAM_COLORS = ['red', 'blue', 'yellow', 'lime', 'magenta'];
+
 export const MAX_TONES = 10;
 
 export interface RoundOptions {
@@ -14,8 +27,10 @@ export interface RoundOptions {
   onPlace?(node: Node): void;
   /** Called when a finger leaves before a pick has been made. */
   onLift?(node: Node): void;
-  /** Called once when the winner is picked. */
-  onPick?(winner: Node): void;
+  /** Called once when the pick is made. */
+  onPick?(result: PickResult): void;
+  /** Initial mode. Defaults to picking one player. */
+  mode?: Mode;
   /** Random source in [0, 1). Defaults to Math.random. */
   random?: () => number;
   /** Clock used for node timestamps. Defaults to performance.now. */
@@ -26,22 +41,23 @@ export interface RoundOptions {
 /**
  * The game state for one screen of fingers, independent of the DOM, canvas and audio.
  *
- * Lifecycle: fingers are placed → once there are at least two and nothing has
- * changed for `decisionTime`, one is picked and the round locks → the round
- * unlocks only after *every* finger (winner, losers, and any placed while
- * locked) has been lifted.
+ * Lifecycle: fingers are placed → once there are more fingers than the mode's
+ * count and nothing has changed for `decisionTime`, the pick is made and the
+ * round locks → the round unlocks only after *every* finger (picked or not, and
+ * any placed while locked) has been lifted.
  */
 export class Round {
   /** Nodes currently drawn on screen. */
   readonly nodes: Node[] = [];
 
-  /** Touches that are participating (before a pick) or the winner (after). */
+  /** Touches that are participating (before a pick) or still shown (after). */
   private readonly touches = new Map<number, Node>();
-  /** Touches still down after a pick that aren't the winner; they must lift before the next round. */
+  /** Touches still down after a pick that aren't shown; they must lift before the next round. */
   private readonly lingering = new Set<number>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private _locked = false;
-  private _winner: Node | null = null;
+  private _result: PickResult | null = null;
+  private _mode: Mode;
 
   private readonly opts: RoundOptions;
   private readonly random: () => number;
@@ -53,14 +69,32 @@ export class Round {
     this.random = opts.random ?? Math.random;
     this.now = opts.now ?? (() => performance.now());
     this.decisionTime = opts.decisionTime ?? WAIT_DECISION_TIME;
+    this._mode = { ...(opts.mode ?? DEFAULT_MODE) };
   }
 
   get locked(): boolean {
     return this._locked;
   }
 
-  get winner(): Node | null {
-    return this._winner;
+  /** The pick, while the round is locked; otherwise null. */
+  get result(): PickResult | null {
+    return this._result;
+  }
+
+  get mode(): Mode {
+    return { ...this._mode };
+  }
+
+  /** True when no fingers are down and nothing is shown. */
+  get idle(): boolean {
+    return !this._locked && this.touches.size === 0 && this.lingering.size === 0;
+  }
+
+  /** Changes the mode. Only allowed while idle; returns whether it took effect. */
+  setMode(mode: Mode): boolean {
+    if (!this.idle) return false;
+    this._mode = { ...mode };
+    return true;
   }
 
   touchStart(id: number, x: number, y: number): void {
@@ -114,12 +148,12 @@ export class Round {
     this.lingering.clear();
     this.nodes.length = 0;
     this._locked = false;
-    this._winner = null;
+    this._result = null;
   }
 
   private updateTimer(): void {
     this.clearTimer();
-    if (this.nodes.length >= 2) {
+    if (this.nodes.length >= fingersNeeded(this._mode)) {
       this.timer = setTimeout(() => {
         this.timer = null;
         this.pick();
@@ -135,20 +169,45 @@ export class Round {
   }
 
   private pick(): void {
-    if (this.nodes.length < 2) return;
-    const winner = this.nodes[Math.floor(this.random() * this.nodes.length)];
+    if (this.nodes.length < fingersNeeded(this._mode)) return;
+    const order = this.draw(this.nodes);
+    const now = this.now();
+    let shown: Node[];
+    if (this._mode.kind === 'players') {
+      shown = order.slice(0, this._mode.count);
+      this._result = { kind: 'players', winners: shown };
+    } else {
+      const colors = this.draw(TEAM_COLORS);
+      const teams: Node[][] = Array.from({ length: this._mode.count }, () => []);
+      order.forEach((node, i) => teams[i % teams.length].push(node));
+      teams.forEach((team, t) => team.forEach(node => (node.color = colors[t % colors.length])));
+      shown = order;
+      this._result = { kind: 'teams', teams };
+    }
     for (const [id, node] of this.touches) {
-      if (node !== winner) {
+      if (!shown.includes(node)) {
         this.touches.delete(id);
         this.lingering.add(id);
       }
     }
     this.nodes.length = 0;
-    this.nodes.push(winner);
-    winner.selectedTime = this.now();
-    this._winner = winner;
+    this.nodes.push(...shown);
+    for (const node of shown) node.selectedTime = now;
     this._locked = true;
-    this.opts.onPick?.(winner);
+    this.opts.onPick?.(this._result);
+  }
+
+  /**
+   * The items in random order, each drawn uniformly from those left. A random source
+   * that always returns 0 keeps the original order, which tests rely on.
+   */
+  private draw<T>(items: readonly T[]): T[] {
+    const left = [...items];
+    const out: T[] = [];
+    while (left.length > 0) {
+      out.push(left.splice(Math.floor(this.random() * left.length), 1)[0]);
+    }
+    return out;
   }
 
   private removeNode(node: Node): void {

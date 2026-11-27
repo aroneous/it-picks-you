@@ -1,7 +1,6 @@
-import { drawHalo, drawNode } from "./draw";
+import { drawNode } from "./draw";
 
 const FILL_IN_TIME = 1000; // ms
-const HALO_EXPAND_TIME = 500; // ms
 const ROTATION_PERIOD = 1500; // ms
 const START_ARC_LENGTH = 0.25 * 2 * Math.PI; // radians
 const FILL_IN_ARC_LENGTH = 0.75 * 2 * Math.PI; // radians
@@ -26,6 +25,7 @@ export class Node implements NodeState {
   /** Index into the audio scale; used for this finger's place, lift and win sounds. */
   toneIndex: number;
   placedTime: DOMHighResTimeStamp;
+  /** When the pick was made, if this node was kept. Freezes the pulse; the results renderer uses it to animate. */
   selectedTime: DOMHighResTimeStamp | undefined = undefined;
 
   constructor(
@@ -62,17 +62,5 @@ export class Node implements NodeState {
     const actualRadius = radius * (1 + (PULSE_MAGNITUDE * pulse));
 
     drawNode(ctx, this.x, this.y, actualRadius, this.color, this.getArcStart(elapsed), this.getArcEnd(elapsed));
-
-    if (this.selectedTime) {
-      const haloElapsed = performance.now() - this.selectedTime;
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      const haloMinRadius = radius * 1.2;
-      const haloMaxRadius = Math.max(width, height);
-      const haloRadius = haloMinRadius + (haloMaxRadius - haloMinRadius) * Math.min(haloElapsed / HALO_EXPAND_TIME, 1);
-      ctx.save();
-      drawHalo(ctx, this.x, this.y, haloMinRadius, haloRadius, this.color);
-      ctx.restore();
-    }
   }
 }

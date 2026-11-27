@@ -1,6 +1,6 @@
 # It Picks You: developer notes
 
-A start-player picker. Everyone puts a finger on the screen and after a short wait one of them is chosen at random. It copies the behaviour of the retired app Chwazi. It's a static, client-only PWA with no backend. In production it's served from https://itpicksyou.wily.cc/ on Cloudflare Pages (see Deployment).
+A start-player picker. Everyone puts a finger on the screen and after a short wait one of them is chosen at random. A selector at the top can change this to several players, or to splitting everyone into teams. It copies the behaviour of the retired app Chwazi. It's a static, client-only PWA with no backend. In production it's served from https://itpicksyou.wily.cc/ on Cloudflare Pages (see Deployment).
 
 ## Stack and commands
 
@@ -19,9 +19,13 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 |---|---|
 | `index.ts` | Entry point. On `DOMContentLoaded` it checks for touch support (shows a "needs touch" message if there isn't any, but still starts the app) and calls `initializeApp()`. |
 | `app.ts` | The browser side: creates the canvas, forwards touch events to a `Round`, plays sounds from the `Round` callbacks, runs the render loop, and builds the info button and overlay. |
-| `round.ts` | The game rules, with no DOM, canvas or audio: which fingers are in, the decision timer, picking the winner, locking, and colour and tone assignment. The RNG and clock can be injected, so it's fully unit-tested. |
-| `state.ts` | The `Node` class, one per finger. It holds position, colour, and timestamps, and works out the animation (spinning arc that fills in, pulse, and the winner's halo expanding to fill the screen). |
-| `draw.ts` | Pure canvas helpers: `drawNode` (disc plus arc ring) and `drawHalo` (annulus). |
+| `round.ts` | The game rules, with no DOM, canvas or audio: which fingers are in, the decision timer, the pick (players or teams), locking, and colour and tone assignment. The RNG and clock can be injected, so it's fully unit-tested. |
+| `mode.ts` | Pure mode rules: `{ kind: 'players' \| 'teams', count }`, the count range (players 1–`MAX_COUNT`, teams 2–`MAX_COUNT`), cycling, labels, how many fingers a pick needs, and validating a stored mode. |
+| `modeSelector.ts` | The capsule at the top (DOM). Tapping the number cycles it; tapping the word toggles players/teams. Remembers the mode in `localStorage` (`itpicksyou.mode`), hides while the round isn't idle, and only shows a mode once `Round.setMode` has accepted it. |
+| `voronoi.ts` | Pure geometry: Voronoi cells as convex polygons (half-plane clipping), shrunk by an inset along shared edges, and a rounded-corner polygon path. |
+| `regions.ts` | Draws the result of a multi-player pick: each winner's Voronoi region in its colour, with a gap (`BOUNDARY_WIDTH`) between regions, rounded corners (`CORNER_RADIUS`), and the colour expanding out from the winner (`HALO_EXPAND_TIME`). Regions are computed over a rect bigger than the screen so only inner boundaries show. |
+| `state.ts` | The `Node` class, one per finger. It holds position, colour, tone, and timestamps, and draws the ring (spinning arc that fills in, and a pulse that freezes at the pick). |
+| `draw.ts` | Pure canvas helper `drawNode` (disc plus arc ring). |
 | `audio.ts` | Web Audio synth. It uses one lazily created `AudioContext` that feeds a master gain and then a compressor/limiter. `playTone` is the "finger down" blip and `playSelectedTone` is the winner and finger-up sound. Tones are picked from a fixed scale (`SCALE_SEMITONES`) relative to A440. |
 | `styles.css` | Styles for the info button and overlay only. |
 
@@ -30,14 +34,19 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 ## How a round works (`round.ts`)
 
 1. `touchStart`: if the round isn't locked, each new touch gets a `Node` with a colour (unique among nodes on screen where possible) and a tone index (lowest free, up to `MAX_TONES`), and `onPlace` fires. `app.ts` calls `resumeAudioContext()` on every touchstart, because the browser autoplay policy requires a user gesture.
-2. Every time a finger is added or lifted, the 2 s timer (`WAIT_DECISION_TIME`) restarts as long as there are at least 2 nodes. With fewer than 2 it's cancelled. A lift before the pick fires `onLift`.
-3. When the timer fires, a random node wins. The other touches move from `touches` to `lingering`, `nodes` is reduced to just the winner, the winner's `selectedTime` is set (which starts the halo animation), the round locks, and `onPick(winner)` fires.
-4. While the round is locked, new touches are added to `lingering` and never become nodes. The round unlocks only once every touch has lifted: the winner, the losers, and any touch placed while locked.
+2. Every time a finger is added or lifted, the 2 s timer (`WAIT_DECISION_TIME`) restarts as long as there are more fingers than the mode's count (`fingersNeeded`: 2 for one player, 4 for three teams). With fewer it's cancelled. A lift before the pick fires `onLift`.
+3. When the timer fires, the fingers are put in random order (`draw()`: each drawn uniformly from those left; a random source that always returns 0 keeps the original order, which the tests rely on). Then:
+   - **players**: the first `count` win. Everyone else moves from `touches` to `lingering` and disappears.
+   - **teams**: everyone stays. Fingers are dealt into `count` teams in turn (sizes differ by at most one), and each team's nodes take a colour from `TEAM_COLORS`, a distinct-looking subset of `COLOR_LIST`, in random order.
+   Every kept node gets `selectedTime`, the round locks, `result` is set, and `onPick(result)` fires.
+4. While the round is locked, new touches are added to `lingering` and never become nodes. The round unlocks only once every touch has lifted, kept or not, and including any placed while locked.
 5. When a touch event reports `e.touches.length === 0`, `app.ts` calls `round.noTouchesRemaining()`. That resets any leftover state, so a touchend the browser never delivered can't leave the round stuck.
 
-Each `Node` carries its own `toneIndex`, so its place, lift and win sounds always match. `app.ts` redraws `round.nodes` on every animation frame. The ring radius is `min(width, height) / 8`.
+`setMode` only works while the round is `idle` (no fingers down, not locked); the selector is hidden otherwise.
 
-Timing constants: `WAIT_DECISION_TIME` in `round.ts`, tone durations in `app.ts`, and animation (fill-in, rotation, pulse, halo) in `state.ts`.
+`app.ts` draws `regions.ts` under the nodes when the result is `players` (one region per remaining winner, recomputed every frame so regions follow moving fingers; with one winner that's a full-screen halo). Teams have no background. Pick sounds: each winner's own note for players; one note per team for teams. The ring radius is `min(width, height) / 8`.
+
+Timing constants: `WAIT_DECISION_TIME` in `round.ts`, tone durations in `app.ts`, ring animation in `state.ts`, region animation and styling in `regions.ts`.
 
 ## Known issues and rough edges
 
@@ -50,14 +59,14 @@ Timing constants: `WAIT_DECISION_TIME` in `round.ts`, tone durations in `app.ts`
 **Unit tests (Vitest)** run in the Node environment, with no DOM. They live next to the code as `src/*.test.ts`.
 
 - `round.test.ts` covers the game rules with fake timers and an injected `random`/`now`. Add a test here for any change to the rules.
-- `state.test.ts` covers the arc and fill maths. `audio.test.ts` covers the frequency maths.
+- `mode.test.ts` covers the selector rules. `voronoi.test.ts` covers the cell geometry (areas, insets, containment). `state.test.ts` covers the arc and fill maths. `audio.test.ts` covers the frequency maths.
 - Keep new game logic in pure modules like `round.ts` rather than `app.ts`, so it can be tested without a browser.
 
-**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the info overlay, and the manifest and service worker.
+**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the mode selector, multi-player regions and team colours (`modes.spec.ts`), the info overlay, and the manifest and service worker.
 
 - Multi-touch: `e2e/touch.ts` has a `Fingers` helper built on CDP `Input.dispatchTouchEvent`, because Playwright's `touchscreen` only taps. `touchStart` sends every finger that's down; `touchEnd` lists the fingers being lifted. Don't release fingers by sending a `touchMove` without them: Chromium holds that touchend back until the next input event.
 - Assertions read canvas pixels with `alphaAt(x, y)`: alpha 0 means nothing is drawn there. The background is a CSS gradient, not drawn on the canvas. A ring is opaque at its finger's position, and after a pick the winner's halo fills the screen, so a corner pixel becomes opaque.
-- To fix the winner, use `page.addInitScript(() => (Math.random = () => 0))` and then reload. `Round` keeps its own reference to `Math.random` when it's created, so overriding it after the page loads has no effect.
+- To make a test deterministic, call `deterministic(page, mode?)` from `e2e/touch.ts` before `page.goto` (or before a reload). It makes `Math.random` return 0, so the first fingers win, colours come in `COLOR_LIST`/`TEAM_COLORS` order, and teams are dealt in turn. It can also store a mode. `Round` keeps its own reference to `Math.random` when it's created, so overriding it after the page loads has no effect. `rgbaAt` reads a pixel's colour for checks like "this finger turned red".
 - Wait for state changes with `expect.poll(...)`, not fixed timeouts, except when checking that something *doesn't* happen.
 
 ## CI/CD

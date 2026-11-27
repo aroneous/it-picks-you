@@ -113,3 +113,53 @@
 	margin-bottom: 0;
 	color: #ccc;
 }
+
+/* Mode selector: a capsule at the top with the number on the left, players/teams on the right. */
+.mode-selector {
+	position: fixed;
+	top: calc(env(safe-area-inset-top, 0px) + 16px);
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	border-radius: 999px;
+	background: rgba(255,255,255,0.06);
+	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+	overflow: hidden;
+	z-index: 10001;
+	transition: opacity 0.2s;
+	font-family: system-ui, sans-serif;
+	user-select: none;
+	-webkit-user-select: none;
+}
+.mode-selector.hidden {
+	opacity: 0;
+	pointer-events: none;
+}
+.mode-selector button {
+	appearance: none;
+	border: none;
+	background: transparent;
+	color: #ccc;
+	font: inherit;
+	font-size: 1.05rem;
+	height: 44px;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	transition: background 0.15s;
+}
+.mode-selector button:active {
+	background: rgba(255,255,255,0.1);
+}
+.mode-selector .mode-count {
+	min-width: 52px;
+	padding: 0 14px 0 18px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	color: #eee;
+	border-right: 1px solid rgba(255,255,255,0.14);
+}
+.mode-selector .mode-kind {
+	min-width: 92px;
+	padding: 0 20px 0 14px;
+	text-align: left;
+}

@@ -1,5 +1,7 @@
 import { playScaleSelectedTone, playScaleTone, resumeAudioContext } from "./audio";
-import { Round } from "./round";
+import { createModeSelector, loadMode, ModeSelector } from "./modeSelector";
+import { drawRegions } from "./regions";
+import { PickResult, Round } from "./round";
 
 const TONE_DURATION = 600; // ms
 const SELECTED_TONE_DURATION = 1200; // ms
@@ -8,8 +10,20 @@ const REMOVE_TOUCH_DURATION = 100; // ms
 const round = new Round({
     onPlace: node => playScaleTone(node.toneIndex, TONE_DURATION),
     onLift: node => playScaleSelectedTone(node.toneIndex, REMOVE_TOUCH_DURATION),
-    onPick: winner => playScaleSelectedTone(winner.toneIndex, SELECTED_TONE_DURATION),
+    onPick: playPickSound,
+    mode: loadMode(),
 });
+
+/** Every kept finger's own note for players; one note per team (spread across the scale) for teams. */
+function playPickSound(result: PickResult) {
+    if (result.kind === 'players') {
+        for (const winner of result.winners) playScaleSelectedTone(winner.toneIndex, SELECTED_TONE_DURATION);
+    } else {
+        result.teams.forEach((_, t) => playScaleSelectedTone(t * 2, SELECTED_TONE_DURATION));
+    }
+}
+
+let selector: ModeSelector | null = null;
 
 let canvas: HTMLCanvasElement | null = null;
 let ctx: CanvasRenderingContext2D | null = null;
@@ -57,10 +71,14 @@ function step() {
         const height = window.innerHeight;
         ctx.clearRect(0, 0, width, height);
         const radius = Math.min(width, height) / 8;
+        if (round.result?.kind === 'players') {
+            drawRegions(ctx, round.nodes, width, height, radius, performance.now());
+        }
         for (const node of round.nodes) {
             node.draw(ctx, radius);
         }
     }
+    selector?.setHidden(!round.idle);
     requestAnimationFrame(step);
 }
 
@@ -80,6 +98,7 @@ export function initializeApp() {
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+    selector = createModeSelector(round.mode, mode => round.setMode(mode));
     requestAnimationFrame(step);
     // Prevent scrolling on touch
     document.body.style.overscrollBehavior = 'none';
@@ -111,6 +130,8 @@ export function initializeApp() {
           <p>The eternal question: who will go first in the game? This provides the answer!
           All players lay a finger on the screen, and wait a couple of seconds. Your fate will
           be determined.</p>
+          <p>Use the selector at the top to pick more than one player, or to split everyone
+          into teams. Tap the number to change it.</p>
 
           <h2>Isn't this just Chwazi but less full-featured?</h2>
           <p>...yes, but Chwazi went away, so now you have this.</p>

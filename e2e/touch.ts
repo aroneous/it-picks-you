@@ -63,3 +63,25 @@ export async function nextFrames(page: Page): Promise<void> {
     () => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
   );
 }
+
+/** RGBA of the canvas pixel at a CSS-pixel position. */
+export async function rgbaAt(page: Page, x: number, y: number): Promise<[number, number, number, number]> {
+  return page.evaluate(([x, y]) => {
+    const canvas = document.querySelector('canvas')!;
+    const dpr = canvas.width / canvas.clientWidth;
+    const d = canvas.getContext('2d')!.getImageData(Math.floor(x * dpr), Math.floor(y * dpr), 1, 1).data;
+    return [d[0], d[1], d[2], d[3]] as [number, number, number, number];
+  }, [x, y] as const);
+}
+
+/**
+ * Sets up the page before the app loads: `Math.random` always returning 0 (so the first
+ * finger wins, colours are assigned in COLOR_LIST order, and teams are dealt in turn),
+ * and optionally a stored mode. Call before `page.goto`/`page.reload`.
+ */
+export async function deterministic(page: Page, mode?: { kind: 'players' | 'teams'; count: number }): Promise<void> {
+  await page.addInitScript(m => {
+    Math.random = () => 0;
+    if (m) localStorage.setItem('itpicksyou.mode', JSON.stringify(m));
+  }, mode);
+}

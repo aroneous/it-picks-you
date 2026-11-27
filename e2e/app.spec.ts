@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { alphaAt, Fingers, nextFrames } from './touch';
+import { alphaAt, deterministic, Fingers, nextFrames } from './touch';
 
 // Matches WAIT_DECISION_TIME in src/round.ts plus the halo expansion (HALO_EXPAND_TIME).
 const PICK_DELAY = 2000;
@@ -49,9 +49,8 @@ test('a single finger is never picked', async ({ page }) => {
 });
 
 test('stays locked until every finger has lifted', async ({ page }) => {
-  // Make the first finger win so we know which one to lift. Round keeps its own
-  // reference to Math.random, so this has to be in place before the app loads.
-  await page.addInitScript(() => (Math.random = () => 0));
+  // Make the first finger win so we know which one to lift.
+  await deterministic(page);
   await page.reload();
   const fingers = await Fingers.attach(page);
   await fingers.place(A, B);

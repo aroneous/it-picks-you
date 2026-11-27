@@ -36,17 +36,17 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 1. `touchStart`: if the round isn't locked, each new touch gets a `Node` with a colour (unique among nodes on screen where possible) and a tone index (lowest free, up to `MAX_TONES`), and `onPlace` fires. `app.ts` calls `resumeAudioContext()` on every touchstart, because the browser autoplay policy requires a user gesture.
 2. Every time a finger is added or lifted, the 2 s timer (`WAIT_DECISION_TIME`) restarts as long as there are more fingers than the mode's count (`fingersNeeded`: 2 for one player, 4 for three teams). With fewer it's cancelled. A lift before the pick fires `onLift`.
 3. When the timer fires, the fingers are put in random order (`draw()`: each drawn uniformly from those left; a random source that always returns 0 keeps the original order, which the tests rely on). Then:
-   - **players**: the first `count` win. Everyone else moves from `touches` to `lingering` and disappears.
+   - **players**: the first `count` win. Everyone else moves from `touches` to `lingering` and disappears. Winners are then sorted by tone index (lowest pitch first; `audio.test.ts` checks that tone index order is pitch order) and revealed one at a time: each winner's `selectedTime` is `now + i * PICK_STAGGER` (0.5 s). That timestamp drives both its note (`app.ts` schedules it) and its region's swell (`regions.ts` draws nothing for a winner before its `selectedTime`).
    - **teams**: everyone stays. Fingers are dealt into `count` teams in turn (sizes differ by at most one), and each team's nodes take a colour from `TEAM_COLORS`, a distinct-looking subset of `COLOR_LIST`, in random order.
-   Every kept node gets `selectedTime`, the round locks, `result` is set, and `onPick(result)` fires.
+   For teams every node's `selectedTime` is `now`. The round locks, `result` is set, and `onPick(result)` fires.
 4. While the round is locked, new touches are added to `lingering` and never become nodes. The round unlocks only once every touch has lifted, kept or not, and including any placed while locked.
 5. When a touch event reports `e.touches.length === 0`, `app.ts` calls `round.noTouchesRemaining()`. That resets any leftover state, so a touchend the browser never delivered can't leave the round stuck.
 
 `setMode` only works while the round is `idle` (no fingers down, not locked); the selector is hidden otherwise.
 
-`app.ts` draws `regions.ts` under the nodes when the result is `players` (one region per remaining winner, recomputed every frame so regions follow moving fingers; with one winner that's a full-screen halo). Teams have no background. Pick sounds: each winner's own note for players; one note per team for teams. The ring radius is `min(width, height) / 8`.
+`app.ts` draws `regions.ts` under the nodes when the result is `players` (one region per remaining winner, recomputed every frame so regions follow moving fingers; with one winner that's a full-screen halo). Teams have no background. Pick sounds: for players, each winner's own note at its reveal time (pending notes are skipped if the round has already reset); for teams, a single note (`TEAMS_PICK_TONE`). The ring radius is `min(width, height) / 8`.
 
-Timing constants: `WAIT_DECISION_TIME` in `round.ts`, tone durations in `app.ts`, ring animation in `state.ts`, region animation and styling in `regions.ts`.
+Timing constants: `WAIT_DECISION_TIME` and `PICK_STAGGER` in `round.ts`, tone durations in `app.ts`, ring animation in `state.ts`, region animation and styling in `regions.ts`.
 
 ## Known issues and rough edges
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { COLOR_LIST, PickResult, Round, RoundOptions, TEAM_COLORS, WAIT_DECISION_TIME } from './round';
+import { COLOR_LIST, PICK_STAGGER, PickResult, Round, RoundOptions, TEAM_COLORS, WAIT_DECISION_TIME } from './round';
 import { MAX_COUNT } from './mode';
 import { Node } from './state';
 
@@ -207,6 +207,16 @@ describe('Round', () => {
       expect(round.nodes.every(n => n.selectedTime !== undefined)).toBe(true);
     });
 
+    it('reveals winners lowest tone first, PICK_STAGGER apart', () => {
+      // random = 0.99 picks the last fingers placed, i.e. the highest tones, in reverse order.
+      const { round, onPick } = makeRound({ mode: { kind: 'players', count: 3 }, random: () => 0.99, now: () => 1000 });
+      [1, 2, 3, 4, 5].forEach(id => round.touchStart(id, 0, 0));
+      vi.advanceTimersByTime(WAIT_DECISION_TIME);
+      const result = onPick.mock.calls[0][0] as Extract<PickResult, { kind: 'players' }>;
+      expect(result.winners.map(n => n.toneIndex)).toEqual([2, 3, 4]);
+      expect(result.winners.map(n => n.selectedTime)).toEqual([1000, 1000 + PICK_STAGGER, 1000 + 2 * PICK_STAGGER]);
+    });
+
     it('stays locked until losers and winners have all lifted', () => {
       const { round } = makeRound({ mode: { kind: 'players', count: 2 } });
       [1, 2, 3].forEach(id => round.touchStart(id, 0, 0));
@@ -261,6 +271,13 @@ describe('Round', () => {
       const teams = (round.result as Extract<PickResult, { kind: 'teams' }>).teams;
       expect(teams.map(t => t.map(n => n.id))).toEqual([['1', '3'], ['2']]);
       expect(teams.map(t => t[0].color)).toEqual([TEAM_COLORS[0], TEAM_COLORS[1]]);
+    });
+
+    it('marks every finger as picked at the same moment', () => {
+      const { round } = makeRound({ mode: { kind: 'teams', count: 2 }, now: () => 1000 });
+      [1, 2, 3, 4].forEach(id => round.touchStart(id, 0, 0));
+      vi.advanceTimersByTime(WAIT_DECISION_TIME);
+      expect(round.nodes.map(n => n.selectedTime)).toEqual([1000, 1000, 1000, 1000]);
     });
 
     it('unlocks once every team member has lifted', () => {

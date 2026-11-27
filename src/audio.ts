@@ -38,6 +38,16 @@ export function frequencyForNodeIndex(index: number): number {
   return A_440 * Math.pow(SEMITONE_RATIO, index);
 }
 
+/**
+ * The frequency a tone index plays at: its step in SCALE_SEMITONES, wrapping around.
+ * Within the scale's length, higher tone indexes are higher pitches; round.ts relies on
+ * that to reveal winners lowest note first.
+ */
+export function frequencyForTone(toneIndex: number): number {
+  const scaleIndex = ((toneIndex % SCALE_SEMITONES.length) + SCALE_SEMITONES.length) % SCALE_SEMITONES.length;
+  return frequencyForNodeIndex(SCALE_SEMITONES[scaleIndex]);
+}
+
 export function playTone(frequency: number, duration: number): void {
   const { audioCtx, masterGain } = getAudioContext();
   const oscillator = audioCtx.createOscillator();
@@ -69,10 +79,7 @@ export function playTone(frequency: number, duration: number): void {
 }
 
 function playScaledTone(nodeIndex: number, duration: number, cb: (frequency: number, duration: number) => void): void {
-  const scaleIndex = ((nodeIndex % SCALE_SEMITONES.length) + SCALE_SEMITONES.length) % SCALE_SEMITONES.length;
-  const semitoneOffset = SCALE_SEMITONES[scaleIndex];
-  const frequency = frequencyForNodeIndex(semitoneOffset);
-  cb(frequency, duration);
+  cb(frequencyForTone(nodeIndex), duration);
 }
 
 export function playScaleTone(nodeIndex: number, duration: number): void {

@@ -1,11 +1,13 @@
 import { playScaleSelectedTone, playScaleTone, resumeAudioContext } from "./audio";
 import { createModeSelector, loadMode, ModeSelector } from "./modeSelector";
 import { drawRegions } from "./regions";
-import { PickResult, Round } from "./round";
+import { PICK_STAGGER, PickResult, Round } from "./round";
 
 const TONE_DURATION = 600; // ms
 const SELECTED_TONE_DURATION = 1200; // ms
 const REMOVE_TOUCH_DURATION = 100; // ms
+/** The single note played when teams are picked (A440 in the scale). */
+const TEAMS_PICK_TONE = 5;
 
 const round = new Round({
     onPlace: node => playScaleTone(node.toneIndex, TONE_DURATION),
@@ -14,13 +16,21 @@ const round = new Round({
     mode: loadMode(),
 });
 
-/** Every kept finger's own note for players; one note per team (spread across the scale) for teams. */
+/**
+ * Players: each winner's own note, one after another (lowest first) in step with its
+ * region appearing. Teams: one note.
+ */
 function playPickSound(result: PickResult) {
-    if (result.kind === 'players') {
-        for (const winner of result.winners) playScaleSelectedTone(winner.toneIndex, SELECTED_TONE_DURATION);
-    } else {
-        result.teams.forEach((_, t) => playScaleSelectedTone(t * 2, SELECTED_TONE_DURATION));
+    if (result.kind === 'teams') {
+        playScaleSelectedTone(TEAMS_PICK_TONE, SELECTED_TONE_DURATION);
+        return;
     }
+    result.winners.forEach((winner, i) => {
+        const play = () => playScaleSelectedTone(winner.toneIndex, SELECTED_TONE_DURATION);
+        if (i === 0) return play();
+        // Skip notes still pending if everyone has already lifted and the round reset.
+        setTimeout(() => round.result === result && play(), i * PICK_STAGGER);
+    });
 }
 
 let selector: ModeSelector | null = null;

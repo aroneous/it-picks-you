@@ -45,7 +45,8 @@ export function drawRegions(
   winners.forEach((node, i) => {
     const cell = cells[i];
     if (cell.length === 0) return;
-    const progress = Math.min((now - (node.selectedTime ?? now)) / HALO_EXPAND_TIME, 1);
+    // Before a winner's reveal time this is 0: its region stays empty until its turn.
+    const progress = Math.min(Math.max((now - (node.selectedTime ?? now)) / HALO_EXPAND_TIME, 0), 1);
     const haloRadius = hole + (maxRadius - hole) * progress;
 
     const clip = new Path2D();

@@ -2,13 +2,20 @@ import { DEFAULT_MODE, fingersNeeded, Mode } from "./mode";
 import { Node } from "./state";
 
 export type PickResult =
-  /** The chosen players. Everyone else is removed from the screen. */
+  /**
+   * The chosen players, in reveal order. Everyone else is removed from the screen. Winners
+   * are revealed one at a time, lowest tone (pitch) first, `PICK_STAGGER` apart. Each
+   * winner's `selectedTime` is its reveal time, which drives both its sound and its region.
+   */
   | { kind: 'players'; winners: Node[] }
   /** Every finger, split into teams as evenly as possible. Each node takes its team's colour. */
   | { kind: 'teams'; teams: Node[][] };
 
 /** How long fingers must stay still (no fingers added or lifted) before a pick. */
 export const WAIT_DECISION_TIME = 2000; // ms
+
+/** Time between revealing one winner and the next when picking several players. */
+export const PICK_STAGGER = 500; // ms
 
 export const COLOR_LIST = [
   'red', 'blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'lime', 'pink'
@@ -174,7 +181,9 @@ export class Round {
     const now = this.now();
     let shown: Node[];
     if (this._mode.kind === 'players') {
-      shown = order.slice(0, this._mode.count);
+      // Tone indexes rise with pitch (see audio.ts), so this reveals lowest note first.
+      shown = order.slice(0, this._mode.count).sort((a, b) => a.toneIndex - b.toneIndex);
+      shown.forEach((node, i) => (node.selectedTime = now + i * PICK_STAGGER));
       this._result = { kind: 'players', winners: shown };
     } else {
       const colors = this.draw(TEAM_COLORS);
@@ -182,6 +191,7 @@ export class Round {
       order.forEach((node, i) => teams[i % teams.length].push(node));
       teams.forEach((team, t) => team.forEach(node => (node.color = colors[t % colors.length])));
       shown = order;
+      for (const node of shown) node.selectedTime = now;
       this._result = { kind: 'teams', teams };
     }
     for (const [id, node] of this.touches) {
@@ -192,7 +202,6 @@ export class Round {
     }
     this.nodes.length = 0;
     this.nodes.push(...shown);
-    for (const node of shown) node.selectedTime = now;
     this._locked = true;
     this.opts.onPick?.(this._result);
   }

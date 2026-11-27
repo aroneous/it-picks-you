@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { alphaAt, deterministic, Fingers, nextFrames, rgbaAt } from './touch';
 
 const PICK_TIMEOUT = 2000 + 500 + 2000; // WAIT_DECISION_TIME + HALO_EXPAND_TIME + slack

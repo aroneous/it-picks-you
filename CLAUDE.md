@@ -12,11 +12,14 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 - `npm run typecheck`: `tsc` on its own. Test files, `e2e/` and `playwright.config.ts` are type-checked too. TypeScript 7 removed `moduleResolution: node`, so the project uses `Bundler`. It also no longer picks up `@types/*` packages automatically: `tsconfig.json` lists `types: ["node"]`, which Playwright's config needs for `process`.
 - `npm test`: runs the Vitest suite once. `npm run test:watch` runs it in watch mode.
 - `npm run test:e2e`: builds, then runs the Playwright E2E tests against `vite preview`. Run `npx playwright install chromium` once first. After a build, `npx playwright test` skips rebuilding.
+- `npm run screenshots`: regenerates the splash page images in `public/` from the production build: `screenshot-3-players.png` (a scripted 3-player pick with fixed finger positions and colours) and `og-image.png` (the splash at 1200×630, for link previews). Rerun and commit them after visual changes.
 
 ## Source layout (`src/`)
 
 | File | Role |
 |---|---|
+| `index.html` | Besides loading the app, holds the **splash page** (`#splash`) as static HTML, plus SEO and link-preview tags (title, description, canonical, Open Graph, JSON-LD). An inline `<head>` script adds `no-splash` to `<html>` before anything is drawn when the page runs as an installed app (`display-mode` standalone, fullscreen or minimal-ui, or iOS `navigator.standalone`) or when `localStorage['itpicksyou.splashSeen']` is set. |
+| `splash.ts` | The splash's Start button (sets the seen flag, unlocks audio, fades out) and `showSplash()`, used by "About & install" in the info overlay. |
 | `index.ts` | Entry point. On `DOMContentLoaded` it checks for touch support (shows a "needs touch" message if there isn't any, but still starts the app) and calls `initializeApp()`. |
 | `app.ts` | The browser side: creates the canvas, forwards touch events to a `Round`, plays sounds from the `Round` callbacks, runs the render loop, and builds the info button and overlay. |
 | `round.ts` | The game rules, with no DOM, canvas or audio: which fingers are in, the decision timer, the pick (players or teams), locking, and colour and tone assignment. The RNG and clock can be injected, so it's fully unit-tested. |
@@ -29,7 +32,9 @@ A start-player picker. Everyone puts a finger on the screen and after a short wa
 | `audio.ts` | Web Audio synth. It uses one lazily created `AudioContext` that feeds a master gain and then a compressor/limiter. `playTone` is the "finger down" blip and `playSelectedTone` is the winner and finger-up sound. Tones are picked from a fixed scale (`SCALE_SEMITONES`) relative to A440. |
 | `styles.css` | Styles for the info button and overlay only. |
 
-`public/` holds static assets that are copied as-is: the icons, the favicon, and the GitHub mark used in the overlay. The PWA manifest is generated from the `manifest` block in `vite.config.ts`. There's no static manifest file.
+`public/` holds static assets that are copied as-is: the icons, the favicon, the GitHub mark used in the overlay, the splash images (see `npm run screenshots`), `robots.txt` and `sitemap.xml`. The PWA manifest is generated from the `manifest` block in `vite.config.ts`; there's no static manifest file. Its `id` is pinned to `/index.html`, the identity existing installs already have, so `start_url` can change without breaking them. `og-image.png` is left out of the service worker's precache.
+
+**Splash page constraints:** the app must stay at `/`, because installed apps and home-screen icons open it there. The splash is an overlay on that same page, never a separate route. It's its own scroll container with `touch-action: pan-y`, because the app blocks touch scrolling on `<body>`. Keep the decision script inline in `<head>`: a module script runs too late and the splash would flash up.
 
 ## How a round works (`round.ts`)
 
@@ -62,8 +67,9 @@ Timing constants: `WAIT_DECISION_TIME` and `PICK_STAGGER` in `round.ts`, tone du
 - `mode.test.ts` covers the selector rules. `voronoi.test.ts` covers the cell geometry (areas, insets, containment). `state.test.ts` covers the arc and fill maths. `audio.test.ts` covers the frequency maths.
 - Keep new game logic in pure modules like `round.ts` rather than `app.ts`, so it can be tested without a browser.
 
-**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the mode selector, multi-player regions and team colours (`modes.spec.ts`), the info overlay, and the manifest and service worker.
+**E2E tests (Playwright, `e2e/`)** run headless Chromium with touch emulation against the production build. They cover the `app.ts` glue (touch events → `Round` → canvas), the splash page (`splash.spec.ts`), the mode selector, multi-player regions and team colours (`modes.spec.ts`), the info overlay, and the manifest and service worker.
 
+- Import `test`/`expect` from `e2e/fixtures.ts`, not `@playwright/test`. Its `test` marks the splash as seen so tests start in the app; use `test.use({ splash: true })` to test the splash.
 - Multi-touch: `e2e/touch.ts` has a `Fingers` helper built on CDP `Input.dispatchTouchEvent`, because Playwright's `touchscreen` only taps. `touchStart` sends every finger that's down; `touchEnd` lists the fingers being lifted. Don't release fingers by sending a `touchMove` without them: Chromium holds that touchend back until the next input event.
 - Assertions read canvas pixels with `alphaAt(x, y)`: alpha 0 means nothing is drawn there. The background is a CSS gradient, not drawn on the canvas. A ring is opaque at its finger's position, and after a pick the winner's halo fills the screen, so a corner pixel becomes opaque.
 - To make a test deterministic, call `deterministic(page, mode?)` from `e2e/touch.ts` before `page.goto` (or before a reload). It makes `Math.random` return 0, so the first fingers win, colours come in `COLOR_LIST`/`TEAM_COLORS` order, and teams are dealt in turn. It can also store a mode. `Round` keeps its own reference to `Math.random` when it's created, so overriding it after the page loads has no effect. `rgbaAt` reads a pixel's colour for checks like "this finger turned red".

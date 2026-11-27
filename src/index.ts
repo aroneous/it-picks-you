@@ -1,5 +1,6 @@
 // Entrypoint for the client application
 import { initializeApp } from './app';
+import { initSplash } from './splash';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Detect touch support
@@ -30,5 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
         showTouchRequiredMessage();
     }
 
+    initSplash();
     initializeApp();
 });

@@ -2,6 +2,7 @@ import { playScaleSelectedTone, playScaleTone, resumeAudioContext } from "./audi
 import { createModeSelector, loadMode, ModeSelector } from "./modeSelector";
 import { drawRegions } from "./regions";
 import { PICK_STAGGER, PickResult, Round } from "./round";
+import { showSplash } from "./splash";
 
 const TONE_DURATION = 600; // ms
 const SELECTED_TONE_DURATION = 1200; // ms
@@ -145,6 +146,7 @@ export function initializeApp() {
 
           <h2>Isn't this just Chwazi but less full-featured?</h2>
           <p>...yes, but Chwazi went away, so now you have this.</p>
+          <p><button type="button" class="info-about">About &amp; install</button></p>
         </div>
       </div>
     `;
@@ -155,10 +157,15 @@ export function initializeApp() {
       infoOverlay.style.display = 'flex';
       setTimeout(() => infoOverlay.classList.add('open'), 10);
     });
+    const closeInfo = () => {
+      infoOverlay.classList.remove('open');
+      setTimeout(() => (infoOverlay.style.display = 'none'), 200);
+    };
+    infoOverlay.querySelector('.info-about')!.addEventListener('click', () => {
+      closeInfo();
+      showSplash();
+    });
     infoOverlay.addEventListener('click', (e) => {
-      if (e.target === infoOverlay) {
-        infoOverlay.classList.remove('open');
-        setTimeout(() => (infoOverlay.style.display = 'none'), 200);
-      }
+      if (e.target === infoOverlay) closeInfo();
     });
 }

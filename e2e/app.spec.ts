@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { alphaAt, deterministic, Fingers, nextFrames } from './touch';
 
 // Matches WAIT_DECISION_TIME in src/round.ts plus the halo expansion (HALO_EXPAND_TIME).

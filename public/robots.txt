@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://itpicksyou.wily.cc/sitemap.xml

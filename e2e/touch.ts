@@ -1,4 +1,4 @@
-import type { CDPSession, Page } from '@playwright/test';
+import type { CDPSession, Locator, Page } from '@playwright/test';
 
 export interface Point {
   id: number;
@@ -25,6 +25,12 @@ export class Fingers {
     await this.send('touchStart');
   }
 
+  /** Moves fingers that are down (by id) to new positions. */
+  async move(...points: Point[]): Promise<void> {
+    for (const p of points) this.down.set(p.id, p);
+    await this.send('touchMove');
+  }
+
   async lift(...ids: number[]): Promise<void> {
     const lifted = ids.map(id => this.down.get(id)).filter((p): p is Point => !!p);
     for (const p of lifted) this.down.delete(p.id);
@@ -39,7 +45,7 @@ export class Fingers {
     await this.send('touchEnd', []);
   }
 
-  private async send(type: 'touchStart' | 'touchEnd', points = [...this.down.values()]): Promise<void> {
+  private async send(type: 'touchStart' | 'touchMove' | 'touchEnd', points = [...this.down.values()]): Promise<void> {
     await this.cdp.send('Input.dispatchTouchEvent', {
       type,
       touchPoints: points.map(p => ({ id: p.id, x: p.x, y: p.y })),
@@ -85,4 +91,15 @@ export async function deterministic(page: Page, mode?: { kind: 'players' | 'team
     Math.random = () => 0;
     if (m) localStorage.setItem('itpicksyou.mode', JSON.stringify(m));
   }, mode);
+}
+
+/** Touches the middle of `locator` and holds it for `ms` before lifting: a long press. */
+export async function longPress(page: Page, locator: Locator, ms = 700): Promise<void> {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error('Nothing to long-press: the element has no box');
+  const fingers = await Fingers.attach(page);
+  const point = { id: 99, x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await fingers.place(point);
+  await page.waitForTimeout(ms);
+  await fingers.liftAll();
 }

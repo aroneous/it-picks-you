@@ -133,6 +133,8 @@
 	font-family: system-ui, sans-serif;
 	user-select: none;
 	-webkit-user-select: none;
+	/* Long presses open the pickers, not iOS's callout. */
+	-webkit-touch-callout: none;
 }
 .mode-selector.hidden {
 	opacity: 0;
@@ -228,6 +230,101 @@
 }
 .mode-capsule .mode-count:active {
 	background: rgba(255,255,255,0.22);
+}
+
+/*
+ * Long-press pickers. While one is open, the backdrop under the selector catches taps
+ * elsewhere (closing it) and dims the screen a little. The live capsule stays tappable,
+ * so a finger holding its number keeps its events; a tap on it just closes the picker.
+ */
+.mode-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 10000;
+	background: rgba(10,10,14,0.45);
+	animation: mode-backdrop-in 0.2s ease-out;
+}
+.mode-backdrop[hidden] {
+	display: none;
+}
+@keyframes mode-backdrop-in {
+	from { opacity: 0; }
+}
+
+/* The knob's menu: the other modes' capsules, stacked below the live one. */
+.mode-menu {
+	position: absolute;
+	top: calc(100% + 10px);
+	left: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+}
+.mode-selector .mode-option {
+	position: relative;
+	padding: 0 20px 0 18px;
+	background: #26272e;
+	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18), 0 4px 14px rgba(0,0,0,0.35);
+}
+.mode-selector .mode-option:active,
+.mode-selector .mode-option.hover {
+	background: #31323a;
+}
+@media (hover: hover) {
+	.mode-selector .mode-option:hover {
+		background: #31323a;
+	}
+	.mode-selector .mode-count-option:not(.current):hover {
+		background: rgba(255,255,255,0.14);
+	}
+}
+.mode-capsule span.mode-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+}
+
+/* The number's pane: every number the mode allows, unrolled down from the number. */
+.mode-count-pane {
+	position: absolute;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 0 0 4px;
+	border-radius: 18px;
+	background: #2c2d34;
+	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16), 0 8px 24px rgba(0,0,0,0.45);
+}
+.mode-selector .mode-count-option {
+	min-width: 36px;
+	height: 34px;
+	padding: 0 10px;
+	border-radius: 999px;
+	background: transparent;
+	color: #ddd;
+	font-size: 1.05rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+.mode-selector .mode-count-option:active,
+.mode-selector .mode-count-option.hover {
+	background: rgba(255,255,255,0.14);
+}
+/* Dragging over the current number shows it's still the one you'd pick. */
+.mode-selector .mode-count-option.current.hover {
+	box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
+}
+.mode-selector .mode-count-option.current {
+	background: #f2f2f4;
+	color: #16161a;
+}
+.mode-selector .mode-option:focus-visible,
+.mode-selector .mode-count-option:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 2px;
 }
 
 .info-btn.hidden {

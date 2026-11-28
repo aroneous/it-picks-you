@@ -180,7 +180,8 @@ export function initializeApp() {
           be determined.</p>
           <p>Turn the knob at the top to change what it does: <strong>Choose</strong> one or
           more players, <strong>Split</strong> everyone into teams, or <strong>Rank</strong>
-          everyone in order. Tap the number to change it.</p>
+          everyone in order. Tap the number to change it. Press and hold the knob or the number
+          to choose from a list.</p>
           <p>After a rank, <strong>Start draft</strong> takes turns picking in a fair order:
           each pick goes to whoever is furthest behind, so going first in one round means
           going later in the next.</p>

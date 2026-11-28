@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_SETTINGS, fingersNeeded, kindLabel, MAX_COUNT, ModeSettings, modeName, modeOf, nextCount, nextKind,
-  parseSettings,
+  countOptions, DEFAULT_SETTINGS, fingersNeeded, kindLabel, knobSteps, MAX_COUNT, ModeSettings, modeName, modeOf,
+  nextCount, nextKind, otherKinds, parseSettings, withCount, withKind,
 } from './mode';
 
 const settings = (kind: ModeSettings['kind'], players = 1, teams = 2): ModeSettings => ({ kind, counts: { players, teams } });
@@ -69,5 +69,39 @@ describe('mode', () => {
     expect(parseSettings({ kind: 'teams', count: 3 })).toEqual(settings('teams', 1, 3));
     expect(parseSettings({ kind: 'teams', count: 1 })).toEqual(settings('teams'));
     expect(parseSettings({ kind: 'players', count: MAX_COUNT + 1 })).toEqual(settings('players'));
+  });
+
+  describe('long-press pickers', () => {
+    it('jumps to a mode, keeping each mode’s number', () => {
+      expect(withKind(settings('players', 3, 4), 'rank')).toEqual(settings('rank', 3, 4));
+      expect(withKind(settings('rank', 3, 4), 'teams')).toEqual(settings('teams', 3, 4));
+    });
+
+    it('sets only the current mode’s number, within its range', () => {
+      expect(withCount(settings('players', 1, 4), 5)).toEqual(settings('players', 5, 4));
+      expect(withCount(settings('teams', 1, 4), 3)).toEqual(settings('teams', 1, 3));
+      expect(withCount(settings('teams', 1, 4), 1)).toEqual(settings('teams', 1, 2));
+      expect(withCount(settings('players', 1, 4), MAX_COUNT + 3)).toEqual(settings('players', MAX_COUNT, 4));
+      expect(withCount(settings('rank', 1, 4), 3)).toEqual(settings('rank', 1, 4));
+    });
+
+    it('lists every number a mode can have', () => {
+      expect(countOptions('players')).toEqual(Array.from({ length: MAX_COUNT }, (_, i) => i + 1));
+      expect(countOptions('teams')).toEqual(Array.from({ length: MAX_COUNT - 1 }, (_, i) => i + 2));
+      expect(countOptions('rank')).toEqual([]);
+    });
+
+    it('lists the other modes in knob order after the current one', () => {
+      expect(otherKinds('players')).toEqual(['teams', 'rank']);
+      expect(otherKinds('teams')).toEqual(['rank', 'players']);
+      expect(otherKinds('rank')).toEqual(['players', 'teams']);
+    });
+
+    it('counts knob steps forward between modes', () => {
+      expect(knobSteps('players', 'teams')).toBe(1);
+      expect(knobSteps('players', 'rank')).toBe(2);
+      expect(knobSteps('rank', 'players')).toBe(1);
+      expect(knobSteps('teams', 'teams')).toBe(0);
+    });
   });
 });

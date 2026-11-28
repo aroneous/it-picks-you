@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { alphaAt, deterministic, Fingers, nextFrames, rgbaAt } from './touch';
+import { alphaAt, deterministic, Fingers, longPress, nextFrames, rgbaAt } from './touch';
 
 const PICK_TIMEOUT = 2000 + 500 + 2000; // WAIT_DECISION_TIME + HALO_EXPAND_TIME + slack
 
@@ -16,8 +16,8 @@ const BLUE = [0, 0, 255, 255];
 const GREEN = [0, 128, 0, 255];
 
 test.describe('mode selector', () => {
-  // While a capsule animates out it stays in the DOM, marked `leaving`.
-  const capsule = (page: Page) => page.locator('.mode-capsule:not(.leaving)');
+  // While a capsule animates out it stays in the DOM, marked `leaving`. Menu options are capsules too.
+  const capsule = (page: Page) => page.locator('.mode-capsule:not(.leaving):not(.mode-option)');
 
   test('starts at Choose 1 player, cycles the number, and the knob turns through the modes', async ({ page }) => {
     await page.goto('/');
@@ -69,6 +69,64 @@ test.describe('mode selector', () => {
     await page.reload();
     await knob.click();
     await expect(capsule(page)).toHaveText(/Split\s*into\s*4\s*teams/);
+  });
+
+  test('long-pressing the knob lists the other modes; tapping one makes it the mode', async ({ page }) => {
+    await page.goto('/');
+    const options = page.locator('.mode-option:not(.leaving)');
+    await longPress(page, page.locator('.mode-knob'));
+    // The long press doesn't also turn the knob.
+    await expect(capsule(page)).toHaveText(/Choose\s*1\s*player$/);
+    await expect(options).toHaveCount(2);
+    await expect(options.nth(0)).toHaveText(/Split\s*into\s*2\s*teams/);
+    await expect(options.nth(1)).toHaveText(/Rank\s*all players/);
+
+    await options.nth(1).click();
+    await expect(capsule(page)).toHaveText(/Rank\s*all players/);
+    await expect(page.locator('.mode-menu')).toHaveCount(0);
+    await expect(page.locator('.mode-capsule')).toHaveCount(1);
+    await expect(page.locator('.mode-backdrop')).toBeHidden();
+
+    // The knob carries on from the chosen mode, and the choice is remembered.
+    await page.locator('.mode-knob').click();
+    await expect(capsule(page)).toHaveText(/Choose\s*1\s*player$/);
+    await longPress(page, page.locator('.mode-knob'));
+    await options.nth(0).click();
+    await page.reload();
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
+  });
+
+  test('tapping outside the knob menu closes it without a change', async ({ page }) => {
+    await page.goto('/');
+    await longPress(page, page.locator('.mode-knob'));
+    await expect(page.locator('.mode-option')).toHaveCount(2);
+    await page.mouse.click(200, 600);
+    await expect(page.locator('.mode-menu')).toHaveCount(0);
+    await expect(capsule(page)).toHaveText(/Choose\s*1\s*player$/);
+    // The tap didn't reach the canvas as a finger.
+    expect(await alphaAt(page, 200, 600)).toBe(0);
+  });
+
+  test('long-pressing the number lists every number; tapping one sets it', async ({ page }) => {
+    await page.goto('/');
+    const count = capsule(page).locator('.mode-count');
+    const pane = page.locator('.mode-count-pane');
+    await longPress(page, count);
+    await expect(count).toHaveText('1'); // the long press doesn't also count up
+    await expect(pane.locator('.mode-count-option')).toHaveText(['1', '2', '3', '4', '5']);
+    await expect(pane.locator('.current')).toHaveText('1');
+    await pane.getByRole('button', { name: '4' }).click();
+    await expect(pane).toHaveCount(0);
+    await expect(capsule(page)).toHaveText(/Choose\s*4\s*players/);
+
+    // Split's numbers start at 2.
+    await page.locator('.mode-knob').click();
+    await longPress(page, capsule(page).locator('.mode-count'));
+    await expect(pane.locator('.mode-count-option')).toHaveText(['2', '3', '4', '5']);
+    await expect(pane.locator('.current')).toHaveText('2');
+    await page.keyboard.press('Escape');
+    await expect(pane).toHaveCount(0);
+    await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
   });
 
   test('hides while fingers are on the screen', async ({ page }) => {

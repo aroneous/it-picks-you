@@ -59,6 +59,39 @@ export function nextKind(settings: ModeSettings): ModeSettings {
   return { ...settings, kind };
 }
 
+/** Jumps straight to a mode (the knob's long-press menu). Each mode keeps its own number. */
+export function withKind(settings: ModeSettings, kind: ModeKind): ModeSettings {
+  return { ...settings, kind };
+}
+
+/**
+ * Sets the current mode's number (the number's long-press pane), clamped to the mode's
+ * range. Modes without a number are unchanged.
+ */
+export function withCount(settings: ModeSettings, count: number): ModeSettings {
+  const { kind, counts } = settings;
+  if (!hasCount(kind)) return settings;
+  const clamped = Math.min(MAX_COUNT, Math.max(minCount(kind), Math.round(count)));
+  return { kind, counts: { ...counts, [kind]: clamped } };
+}
+
+/** Every number a mode can have, smallest first (none for Rank). */
+export function countOptions(kind: ModeKind): number[] {
+  if (!hasCount(kind)) return [];
+  return Array.from({ length: MAX_COUNT - minCount(kind) + 1 }, (_, i) => minCount(kind) + i);
+}
+
+/** The other modes, in knob order starting after `kind`: what the long-press menu lists below it. */
+export function otherKinds(kind: ModeKind): ModeKind[] {
+  const i = MODE_KINDS.indexOf(kind);
+  return [1, 2].map(step => MODE_KINDS[(i + step) % MODE_KINDS.length]);
+}
+
+/** How many knob steps forward it takes to get from one mode to another. */
+export function knobSteps(from: ModeKind, to: ModeKind): number {
+  return (MODE_KINDS.indexOf(to) - MODE_KINDS.indexOf(from) + MODE_KINDS.length) % MODE_KINDS.length;
+}
+
 /** A pick happens once there are more fingers than the chosen number; ranking needs two. */
 export function fingersNeeded(mode: Mode): number {
   return mode.kind === 'rank' ? 2 : mode.count + 1;

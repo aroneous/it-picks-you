@@ -1,6 +1,6 @@
 import {
-  hasCount, kindLabel, MAX_COUNT, minCount, Mode, MODE_KINDS, modeName, modeOf, ModeSettings, nextCount, nextKind,
-  parseSettings,
+  countOptions, hasCount, kindLabel, knobSteps, MAX_COUNT, minCount, Mode, MODE_KINDS, ModeKind, modeName, modeOf,
+  ModeSettings, nextCount, nextKind, otherKinds, parseSettings, withCount, withKind,
 } from "./mode";
 
 const STORAGE_KEY = 'itpicksyou.mode';
@@ -29,8 +29,84 @@ export interface ModeSelector {
 
 /** How long a capsule takes to slide out, and the next one to slide in. */
 const CAPSULE_ANIMATION_TIME = 220; // ms
+/** How long a chosen mode takes to move up from the menu into the capsule's place. */
+const MENU_SELECT_TIME = 280; // ms
+/** Delay between one menu capsule (or number) appearing and the next. */
+const MENU_STAGGER = 40; // ms
+/** How long the number pane takes to unroll, or roll back up. */
+const PANE_ANIMATION_TIME = 200; // ms
+/** How long a press must last to count as a long press. */
+const LONG_PRESS_TIME = 450; // ms
+/** A press that moves further than this isn't a long press. */
+const LONG_PRESS_SLOP = 10; // px
 /** The knob turns this far for each mode. */
 const KNOB_STEP = 360 / MODE_KINDS.length; // degrees
+
+/** Where a capsule goes when it leaves, and comes from when it arrives in the menu. */
+const BELOW = 'translateY(14px) scale(0.8)';
+const ABOVE = 'translateY(-14px) scale(0.8)';
+
+/**
+ * Makes a picker's options ignore clicks until a press starts inside the picker. The
+ * long press that opened it ends with a click that can land on whatever option now sits
+ * under the finger; that one mustn't choose it. Keyboard clicks (`detail` 0) always count.
+ */
+function guardClicks(picker: HTMLElement): (e: MouseEvent) => boolean {
+  let armed = false;
+  picker.addEventListener('pointerdown', () => (armed = true));
+  return e => armed || e.detail === 0;
+}
+
+function reduceMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
+/**
+ * Calls `onLongPress` when `el` is held still for `LONG_PRESS_TIME`, and swallows the
+ * click that follows so the element's tap action doesn't also run. A right click (or a
+ * long press the browser reports as `contextmenu`) opens it too.
+ */
+function addLongPress(el: HTMLElement, onLongPress: () => void): void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let start = { x: 0, y: 0 };
+  /** A long press just fired: swallow its click. Reset on the next press, in case no click comes. */
+  let fired = false;
+  const cancel = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+  el.addEventListener('pointerdown', e => {
+    fired = false;
+    if (!e.isPrimary || e.button !== 0) return;
+    start = { x: e.clientX, y: e.clientY };
+    cancel();
+    timer = setTimeout(() => {
+      timer = null;
+      fired = true;
+      navigator.vibrate?.(10);
+      onLongPress();
+    }, LONG_PRESS_TIME);
+  });
+  el.addEventListener('pointermove', e => {
+    if (timer !== null && Math.hypot(e.clientX - start.x, e.clientY - start.y) > LONG_PRESS_SLOP) cancel();
+  });
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) el.addEventListener(type, cancel);
+  el.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    if (fired) return;
+    // A press still down when the browser calls it a context menu is a long press, so its click is swallowed too.
+    if (timer !== null) fired = true;
+    cancel();
+    onLongPress();
+  });
+  // Capture listeners run before the element's own click listener.
+  el.addEventListener('click', e => {
+    if (!fired) return;
+    fired = false;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
+}
 
 /**
  * The selector at the top of the screen: a knob that turns through the modes (Choose,
@@ -42,12 +118,19 @@ const KNOB_STEP = 360 / MODE_KINDS.length; // degrees
  * the knob stays in the same place whatever the mode; narrower capsules leave space on the
  * right.
  *
+ * Long presses open pickers. On the knob: the other two modes' capsules grow in below the
+ * current one, and tapping one moves it up into place (the others leave as on a knob tap).
+ * On the number: it unrolls into a column of every number the mode allows, with the current
+ * one highlighted; tapping one sets it and rolls the column back up. Tapping anywhere else
+ * closes either picker without a change.
+ *
  * `onChange` is asked to apply each new mode and returns whether it did, so the
  * selector never shows a mode that the round didn't accept.
  */
 export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode) => boolean): ModeSelector {
   let settings = initial;
   let knobAngle = MODE_KINDS.indexOf(settings.kind) * KNOB_STEP;
+  let hidden = false;
 
   const root = document.createElement('div');
   root.className = 'mode-selector';
@@ -64,7 +147,13 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
   const slot = document.createElement('div');
   slot.className = 'mode-slot';
   root.append(knob, slot);
-  document.body.appendChild(root);
+
+  /** Under the selector while a picker is open: a tap anywhere else closes it. */
+  const backdrop = document.createElement('div');
+  backdrop.className = 'mode-backdrop';
+  backdrop.hidden = true;
+  backdrop.addEventListener('click', () => closePickers());
+  document.body.append(backdrop, root);
 
   let capsule = buildCapsule(modeOf(settings));
   slot.appendChild(capsule);
@@ -88,9 +177,13 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
     slot.style.width = `${widest}px`;
   }
 
-  function buildCapsule(mode: Mode): HTMLElement {
-    const el = document.createElement('div');
-    el.className = 'mode-capsule';
+  /**
+   * A capsule for `mode`. The live one's number is a button; a menu option is a single
+   * button whose number is just shown.
+   */
+  function buildCapsule(mode: Mode, asOption = false): HTMLElement {
+    const el = document.createElement(asOption ? 'button' : 'div');
+    el.className = asOption ? 'mode-capsule mode-option' : 'mode-capsule';
     const name = document.createElement('span');
     name.className = 'mode-name';
     name.textContent = modeName(mode.kind);
@@ -103,15 +196,26 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
       el.appendChild(into);
     }
     if (hasCount(mode.kind)) {
-      const count = document.createElement('button');
+      const count = document.createElement(asOption ? 'span' : 'button');
       count.className = 'mode-count';
-      count.addEventListener('click', () => update(nextCount(settings), false));
+      if (!asOption) {
+        count.addEventListener('click', () => {
+          if (pane) return closeCountPane();
+          update(nextCount(settings), false);
+        });
+        addLongPress(count, openCountPane);
+      }
       el.appendChild(count);
     }
     const kind = document.createElement('span');
     kind.className = 'mode-kind';
     el.appendChild(kind);
     fillCapsule(el, mode);
+    if (asOption) {
+      const into = mode.kind === 'teams' ? 'into ' : '';
+      const count = hasCount(mode.kind) ? `${mode.count} ` : '';
+      el.setAttribute('aria-label', `${modeName(mode.kind)} ${into}${count}${kindLabel(mode)}`);
+    }
     return el;
   }
 
@@ -120,7 +224,9 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
     const count = el.querySelector('.mode-count');
     if (count) {
       count.textContent = String(mode.count);
-      count.setAttribute('aria-label', `Number of ${mode.kind}: ${mode.count}. Tap to change.`);
+      if (count instanceof HTMLButtonElement) {
+        count.setAttribute('aria-label', `Number of ${mode.kind}: ${mode.count}. Tap to change, or press and hold to choose.`);
+      }
     }
     el.querySelector('.mode-kind')!.textContent = kindLabel(mode);
   }
@@ -131,53 +237,224 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
     const next = modeName(nextKind(settings).kind);
     const count = hasCount(mode.kind) ? `${mode.count} ` : '';
     const into = mode.kind === 'teams' ? 'into ' : '';
-    knob.setAttribute('aria-label', `Mode: ${modeName(mode.kind)} ${into}${count}${kindLabel(mode)}. Tap for ${next}.`);
+    knob.setAttribute(
+      'aria-label',
+      `Mode: ${modeName(mode.kind)} ${into}${count}${kindLabel(mode)}. Tap for ${next}, or press and hold to choose.`,
+    );
   }
 
+  /** Sends a capsule away: down, shrinking and fading. It's removed once gone. */
+  function leave(el: HTMLElement, delay = 0) {
+    el.classList.add('leaving');
+    el.setAttribute('aria-hidden', 'true');
+    el.inert = true;
+    el.getAnimations().forEach(a => a.cancel());
+    if (reduceMotion()) return el.remove();
+    el.animate(
+      [{ transform: 'none', opacity: 1 }, { transform: BELOW, opacity: 0 }],
+      { duration: CAPSULE_ANIMATION_TIME, delay, easing: 'ease-in', fill: 'forwards' }
+    ).finished.then(() => el.remove(), () => el.remove());
+  }
+
+  /** Replaces the capsule with one for the current settings, coming in from above. */
   function swapCapsule() {
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const old = capsule;
-    old.classList.add('leaving');
-    old.setAttribute('aria-hidden', 'true');
-    old.inert = true;
-    old.getAnimations().forEach(a => a.cancel());
+    leave(capsule);
     capsule = buildCapsule(modeOf(settings));
     slot.appendChild(capsule);
-    if (reduceMotion) {
-      old.remove();
-      return;
-    }
-    const away = 'translateY(14px) scale(0.8)';
-    const above = 'translateY(-14px) scale(0.8)';
-    old.animate(
-      [{ transform: 'none', opacity: 1 }, { transform: away, opacity: 0 }],
-      { duration: CAPSULE_ANIMATION_TIME, easing: 'ease-in', fill: 'forwards' }
-    ).finished.then(() => old.remove(), () => old.remove());
+    if (reduceMotion()) return;
     capsule.animate(
-      [{ transform: above, opacity: 0 }, { transform: 'none', opacity: 1 }],
+      [{ transform: ABOVE, opacity: 0 }, { transform: 'none', opacity: 1 }],
       { duration: CAPSULE_ANIMATION_TIME, delay: CAPSULE_ANIMATION_TIME / 3, easing: 'ease-out', fill: 'backwards' }
     );
   }
 
-  function update(next: ModeSettings, kindChanged: boolean) {
-    if (!onChange(modeOf(next))) return;
+  /** Applies new settings if the round accepts them. Returns whether it did. */
+  function apply(next: ModeSettings): boolean {
+    if (!onChange(modeOf(next))) return false;
+    const steps = knobSteps(settings.kind, next.kind);
     settings = next;
     saveSettings(settings);
-    if (kindChanged) {
-      knobAngle += KNOB_STEP;
-      swapCapsule();
-    } else {
-      fillCapsule(capsule, modeOf(settings));
-    }
+    knobAngle += steps * KNOB_STEP;
     renderKnob();
+    return true;
   }
 
-  knob.addEventListener('click', () => update(nextKind(settings), true));
+  function update(next: ModeSettings, kindChanged: boolean) {
+    if (!apply(next)) return;
+    if (kindChanged) swapCapsule();
+    else fillCapsule(capsule, modeOf(settings));
+  }
+
+  function setPickerOpen(open: boolean) {
+    backdrop.hidden = !open;
+    root.classList.toggle('picking', open);
+  }
+
+  function closePickers(instant = false) {
+    closeModeMenu(instant);
+    closeCountPane(instant);
+  }
+
+  // ---- The knob's long-press menu: every mode as a capsule ----
+
+  let menu: HTMLElement | null = null;
+
+  function openModeMenu() {
+    if (menu || hidden) return;
+    closeCountPane(true);
+    const el = document.createElement('div');
+    el.className = 'mode-menu';
+    el.setAttribute('role', 'group');
+    el.setAttribute('aria-label', 'Choose a mode');
+    const counts = guardClicks(el);
+    otherKinds(settings.kind).forEach((kind, i) => {
+      const option = buildCapsule(modeOf(withKind(settings, kind)), true);
+      option.addEventListener('click', e => counts(e) && chooseKind(kind, option));
+      el.appendChild(option);
+      if (!reduceMotion()) {
+        // The reverse of leaving: up from below, growing and fading in.
+        option.animate(
+          [{ transform: BELOW, opacity: 0 }, { transform: 'none', opacity: 1 }],
+          { duration: CAPSULE_ANIMATION_TIME, delay: i * MENU_STAGGER, easing: 'ease-out', fill: 'backwards' },
+        );
+      }
+    });
+    slot.appendChild(el);
+    menu = el;
+    setPickerOpen(true);
+    (el.firstElementChild as HTMLElement | null)?.focus({ preventScroll: true });
+  }
+
+  /** Closes the menu: the options leave as capsules do, the last one first. */
+  function closeModeMenu(instant = false) {
+    const el = menu;
+    if (!el) return;
+    menu = null;
+    setPickerOpen(false);
+    el.inert = true;
+    const options = Array.from(el.querySelectorAll<HTMLElement>('.mode-option'));
+    if (instant || reduceMotion() || options.length === 0) return el.remove();
+    options.reverse().forEach((option, i) => leave(option, i * MENU_STAGGER));
+    setTimeout(() => el.remove(), CAPSULE_ANIMATION_TIME + options.length * MENU_STAGGER);
+  }
+
+  /** A mode was tapped in the menu: it moves up into the capsule's place, and the rest leave. */
+  function chooseKind(kind: ModeKind, option: HTMLElement) {
+    const el = menu;
+    if (!el) return;
+    const from = option.getBoundingClientRect();
+    if (!apply(withKind(settings, kind))) return closeModeMenu();
+    leave(capsule);
+    capsule = buildCapsule(modeOf(settings));
+    slot.appendChild(capsule);
+    if (!reduceMotion()) {
+      const to = capsule.getBoundingClientRect();
+      capsule.animate(
+        [{ transform: `translate(${from.left - to.left}px, ${from.top - to.top}px)` }, { transform: 'none' }],
+        { duration: MENU_SELECT_TIME, easing: 'cubic-bezier(0.3, 0, 0.2, 1)' },
+      );
+    }
+    // The new capsule has taken the option's place; the menu closes around it.
+    option.remove();
+    closeModeMenu();
+  }
+
+  // ---- The number's long-press pane: every number the mode allows ----
+
+  let pane: HTMLElement | null = null;
+
+  function openCountPane() {
+    if (pane || hidden || !hasCount(settings.kind)) return;
+    closeModeMenu(true);
+    const chip = capsule.querySelector<HTMLElement>('.mode-count');
+    if (!chip) return;
+    const { kind } = settings;
+    const current = settings.counts[kind];
+    const el = document.createElement('div');
+    el.className = 'mode-count-pane';
+    el.setAttribute('role', 'group');
+    el.setAttribute('aria-label', `Number of ${kind}`);
+    const counts = guardClicks(el);
+    countOptions(kind).forEach(count => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'mode-count-option';
+      option.textContent = String(count);
+      option.setAttribute('aria-pressed', String(count === current));
+      option.classList.toggle('current', count === current);
+      option.addEventListener('click', e => counts(e) && chooseCount(count));
+      el.appendChild(option);
+    });
+    // Unrolls downward from the number itself: the first option sits where the number was.
+    const chipBox = chip.getBoundingClientRect();
+    const slotBox = slot.getBoundingClientRect();
+    el.style.left = `${chipBox.left - slotBox.left}px`;
+    el.style.top = `${chipBox.top - slotBox.top}px`;
+    el.style.minWidth = `${chipBox.width}px`;
+    slot.appendChild(el);
+    pane = el;
+    setPickerOpen(true);
+    (el.querySelector<HTMLElement>('.current') ?? el.firstElementChild as HTMLElement | null)?.focus({ preventScroll: true });
+    if (reduceMotion()) return;
+    el.animate(
+      [{ clipPath: rolledUp(el, chipBox.height) }, { clipPath: 'inset(0 round 18px)' }],
+      { duration: PANE_ANIMATION_TIME, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+    );
+    Array.from(el.children).forEach((option, i) => {
+      option.animate(
+        [{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }],
+        { duration: PANE_ANIMATION_TIME, delay: i * (MENU_STAGGER / 2), easing: 'ease-out', fill: 'backwards' },
+      );
+    });
+  }
+
+  /** The pane clipped back to the number's size, at its top. */
+  function rolledUp(el: HTMLElement, height: number): string {
+    return `inset(0 0 ${Math.max(0, el.offsetHeight - height)}px 0 round 18px)`;
+  }
+
+  function closeCountPane(instant = false) {
+    const el = pane;
+    if (!el) return;
+    pane = null;
+    setPickerOpen(false);
+    el.inert = true;
+    if (instant || reduceMotion()) return el.remove();
+    const chip = capsule.querySelector<HTMLElement>('.mode-count');
+    el.animate(
+      [{ clipPath: 'inset(0 round 18px)', opacity: 1 }, { clipPath: rolledUp(el, chip?.offsetHeight ?? 34), opacity: 0 }],
+      { duration: PANE_ANIMATION_TIME, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' },
+    ).finished.then(() => el.remove(), () => el.remove());
+  }
+
+  function chooseCount(count: number) {
+    if (apply(withCount(settings, count))) fillCapsule(capsule, modeOf(settings));
+    closeCountPane();
+  }
+
+  knob.addEventListener('click', () => {
+    if (menu || pane) return closePickers();
+    update(nextKind(settings), true);
+  });
+  addLongPress(knob, openModeMenu);
+  // Taps on the selector outside any button (the capsule is inert while picking) close a picker.
+  root.addEventListener('click', e => {
+    if ((menu || pane) && (e.target === root || e.target === slot)) closePickers();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && (menu || pane)) {
+      closePickers();
+      knob.focus();
+    }
+  });
 
   return {
-    setHidden(hidden: boolean) {
-      root.classList.toggle('hidden', hidden);
-      root.toggleAttribute('inert', hidden);
+    setHidden(hide: boolean) {
+      if (hide === hidden) return;
+      hidden = hide;
+      if (hide) closePickers(true);
+      root.classList.toggle('hidden', hide);
+      root.toggleAttribute('inert', hide);
     },
   };
 }

@@ -1,4 +1,4 @@
-import type { CDPSession, Page } from '@playwright/test';
+import type { CDPSession, Locator, Page } from '@playwright/test';
 
 export interface Point {
   id: number;
@@ -85,4 +85,15 @@ export async function deterministic(page: Page, mode?: { kind: 'players' | 'team
     Math.random = () => 0;
     if (m) localStorage.setItem('itpicksyou.mode', JSON.stringify(m));
   }, mode);
+}
+
+/** Touches the middle of `locator` and holds it for `ms` before lifting: a long press. */
+export async function longPress(page: Page, locator: Locator, ms = 700): Promise<void> {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error('Nothing to long-press: the element has no box');
+  const fingers = await Fingers.attach(page);
+  const point = { id: 99, x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await fingers.place(point);
+  await page.waitForTimeout(ms);
+  await fingers.liftAll();
 }

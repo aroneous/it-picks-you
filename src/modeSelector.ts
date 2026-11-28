@@ -53,6 +53,8 @@ function reduceMotion(): boolean {
 /** A press that's still down when its long press fires: which pointer, and where it is now. */
 interface Press {
   id: number;
+  /** `mouse`, `touch` or `pen`. */
+  type: string;
   x: number;
   y: number;
 }
@@ -106,7 +108,7 @@ function addLongPress(el: HTMLElement, onLongPress: (press: Press | null) => voi
     press = null;
     if (!e.isPrimary || e.button !== 0) return;
     start = { x: e.clientX, y: e.clientY };
-    press = { id: e.pointerId, ...start };
+    press = { id: e.pointerId, type: e.pointerType, ...start };
     cancel();
     timer = setTimeout(() => {
       timer = null;
@@ -114,7 +116,7 @@ function addLongPress(el: HTMLElement, onLongPress: (press: Press | null) => voi
     }, LONG_PRESS_TIME);
   });
   el.addEventListener('pointermove', e => {
-    if (press?.id === e.pointerId) press = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    if (press?.id === e.pointerId) press = { ...press, x: e.clientX, y: e.clientY };
     if (timer !== null && Math.hypot(e.clientX - start.x, e.clientY - start.y) > LONG_PRESS_SLOP) cancel();
   });
   const release = () => {
@@ -224,7 +226,7 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
       count.className = 'mode-count';
       if (!asOption) {
         count.addEventListener('click', () => {
-          if (pane) return closeCountPane();
+          if (menu || pane) return closePickers();
           update(nextCount(settings), false);
         });
         addLongPress(count, openCountPane);
@@ -311,7 +313,6 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
 
   function setPickerOpen(open: boolean) {
     backdrop.hidden = !open;
-    root.classList.toggle('picking', open);
   }
 
   function closePickers(instant = false) {
@@ -337,23 +338,44 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
       hover = option;
       hover?.classList.add('hover');
     };
-    const move = (e: PointerEvent) => {
-      if (e.pointerId !== press.id) return;
-      if (!dragging && Math.hypot(e.clientX - press.x, e.clientY - press.y) > LONG_PRESS_SLOP) dragging = true;
-      if (dragging) setHover(optionAt(e.clientX, e.clientY));
+    const moveTo = (x: number, y: number) => {
+      if (!dragging && Math.hypot(x - press.x, y - press.y) > LONG_PRESS_SLOP) dragging = true;
+      if (dragging) setHover(optionAt(x, y));
     };
-    const end = (e: PointerEvent) => {
-      if (e.pointerId !== press.id) return;
+    const finish = (release: { x: number; y: number } | null) => {
       setHover(null);
-      document.removeEventListener('pointermove', move, true);
-      document.removeEventListener('pointerup', end, true);
-      document.removeEventListener('pointercancel', end, true);
+      stop();
       const open = picker === menu || picker === pane;
-      if (e.type === 'pointerup' && dragging && open) optionAt(e.clientX, e.clientY)?.click();
+      if (release && dragging && open) optionAt(release.x, release.y)?.click();
     };
-    document.addEventListener('pointermove', move, true);
-    document.addEventListener('pointerup', end, true);
-    document.addEventListener('pointercancel', end, true);
+
+    // Pointer events, for every kind of input. A browser can cancel a touch's pointer
+    // events part way (deciding it's a gesture) while its touch events carry on, so for a
+    // touch a pointercancel isn't the end: the touch events below see it through.
+    const pointerMove = (e: PointerEvent) => e.pointerId === press.id && moveTo(e.clientX, e.clientY);
+    const pointerUp = (e: PointerEvent) => e.pointerId === press.id && finish({ x: e.clientX, y: e.clientY });
+    const pointerCancel = (e: PointerEvent) => {
+      if (e.pointerId === press.id && press.type !== 'touch') finish(null);
+    };
+    // Touch events: only while this is the only finger down, which it is for a long press.
+    const touchMove = (e: TouchEvent) => {
+      const t = e.touches.length === 1 ? e.touches[0] : null;
+      if (t) moveTo(t.clientX, t.clientY);
+    };
+    const touchEnd = (e: TouchEvent) => {
+      if (e.touches.length > 0) return;
+      const t = e.changedTouches[0];
+      finish(e.type === 'touchend' && t ? { x: t.clientX, y: t.clientY } : null);
+    };
+    // A fresh press anywhere means this one is long gone, whatever events went missing.
+    const nextPress = (e: PointerEvent) => e.pointerId !== press.id && finish(null);
+
+    const listeners = [
+      ['pointermove', pointerMove], ['pointerup', pointerUp], ['pointercancel', pointerCancel],
+      ['touchmove', touchMove], ['touchend', touchEnd], ['touchcancel', touchEnd], ['pointerdown', nextPress],
+    ] as const;
+    const stop = () => listeners.forEach(([type, fn]) => document.removeEventListener(type, fn as EventListener, true));
+    listeners.forEach(([type, fn]) => document.addEventListener(type, fn as EventListener, true));
   }
 
   // ---- The knob's long-press menu: every mode as a capsule ----
@@ -498,9 +520,10 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
     update(nextKind(settings), true);
   });
   addLongPress(knob, openModeMenu);
-  // Taps on the selector outside any button (the capsule is inert while picking) close a picker.
+  // Taps on the selector outside the open picker (on the live capsule, say) close it.
   root.addEventListener('click', e => {
-    if ((menu || pane) && (e.target === root || e.target === slot)) closePickers();
+    const target = e.target as Node;
+    if ((menu || pane) && !menu?.contains(target) && !pane?.contains(target)) closePickers();
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && (menu || pane)) {

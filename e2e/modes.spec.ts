@@ -172,6 +172,34 @@ test.describe('mode selector', () => {
     await expect(capsule(page)).toHaveText(/Rank\s*all players/);
   });
 
+  test('a touch can slide from the number onto another and let go to choose it', async ({ page }) => {
+    await page.goto('/');
+    const count = capsule(page).locator('.mode-count');
+    const box = (await count.boundingBox())!;
+    const fingers = await Fingers.attach(page);
+    const finger = { id: 7, x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    await fingers.place(finger);
+    const pane = page.locator('.mode-count-pane');
+    await expect(pane).toBeVisible();
+    await page.waitForTimeout(300); // let the pane finish unrolling
+    const four = (await pane.getByRole('button', { name: '4' }).boundingBox())!;
+    await fingers.move({ ...finger, y: finger.y + 20 });
+    await fingers.move({ ...finger, y: four.y + four.height / 2 });
+    await expect(pane.locator('.hover')).toHaveText('4');
+    await fingers.liftAll();
+    await expect(pane).toHaveCount(0);
+    await expect(capsule(page)).toHaveText(/Choose\s*4\s*players/);
+  });
+
+  test('tapping the live capsule while a picker is open closes it without a change', async ({ page }) => {
+    await page.goto('/');
+    await longPress(page, page.locator('.mode-knob'));
+    await expect(page.locator('.mode-option')).toHaveCount(2);
+    await capsule(page).locator('.mode-count').click();
+    await expect(page.locator('.mode-menu')).toHaveCount(0);
+    await expect(capsule(page)).toHaveText(/Choose\s*1\s*player$/);
+  });
+
   test('hides while fingers are on the screen', async ({ page }) => {
     await page.goto('/');
     const selector = page.locator('.mode-selector');

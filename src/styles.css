@@ -234,7 +234,8 @@
 
 /*
  * Long-press pickers. While one is open, the backdrop under the selector catches taps
- * elsewhere (closing it) and dims the screen a little, and the live capsule is inert.
+ * elsewhere (closing it) and dims the screen a little. The live capsule stays tappable,
+ * so a finger holding its number keeps its events; a tap on it just closes the picker.
  */
 .mode-backdrop {
 	position: fixed;
@@ -248,9 +249,6 @@
 }
 @keyframes mode-backdrop-in {
 	from { opacity: 0; }
-}
-.mode-selector.picking .mode-capsule:not(.mode-option) {
-	pointer-events: none;
 }
 
 /* The knob's menu: the other modes' capsules, stacked below the live one. */

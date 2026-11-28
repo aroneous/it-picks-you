@@ -48,8 +48,11 @@ export function createRankActions(onDone: () => void, onStartDraft: () => void):
 }
 
 export interface DraftViewOptions {
-  /** Called whenever a player becomes the one to pick, including the first. */
-  onTurn?(player: DraftPlayer): void;
+  /**
+   * Called when a pick is made (Next, or a tap on the card), with the player who just
+   * picked, as their card starts flying down into the history. Not called on opening.
+   */
+  onPick?(player: DraftPlayer): void;
   /** Called once the draft screen has closed. */
   onClose?(): void;
 }
@@ -97,7 +100,6 @@ export function openDraft(players: readonly DraftPlayer[], opts: DraftViewOption
   root.append(history, stage, actions);
   document.body.appendChild(root);
   showCurrent();
-  opts.onTurn?.(draft.current);
   if (!reduceMotion()) {
     root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CARD_FADE_IN_TIME, easing: 'ease-out' });
   }
@@ -136,7 +138,7 @@ export function openDraft(players: readonly DraftPlayer[], opts: DraftViewOption
     history.appendChild(chip);
     history.scrollTop = history.scrollHeight;
     showCurrent();
-    opts.onTurn?.(draft.current);
+    opts.onPick?.(done);
     if (reduceMotion()) return;
 
     // The new chip (and any new row of them) is laid out now, so we know where to fly to.

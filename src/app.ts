@@ -59,7 +59,7 @@ function startDraft() {
     openDraft(
         ranking.map(node => ({ rank: node.rank!, color: node.color, toneIndex: node.toneIndex })),
         {
-            onTurn: player => playScaleTone(player.toneIndex, TONE_DURATION),
+            onPick: player => playScaleTone(player.toneIndex, TONE_DURATION),
             onClose: () => (drafting = false),
         },
     );

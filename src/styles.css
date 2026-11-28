@@ -269,8 +269,17 @@
 	background: #26272e;
 	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18), 0 4px 14px rgba(0,0,0,0.35);
 }
-.mode-selector .mode-option:active {
+.mode-selector .mode-option:active,
+.mode-selector .mode-option.hover {
 	background: #31323a;
+}
+@media (hover: hover) {
+	.mode-selector .mode-option:hover {
+		background: #31323a;
+	}
+	.mode-selector .mode-count-option:not(.current):hover {
+		background: rgba(255,255,255,0.14);
+	}
 }
 .mode-capsule span.mode-count {
 	display: inline-flex;
@@ -302,8 +311,13 @@
 	font-weight: 700;
 	font-variant-numeric: tabular-nums;
 }
-.mode-selector .mode-count-option:active {
+.mode-selector .mode-count-option:active,
+.mode-selector .mode-count-option.hover {
 	background: rgba(255,255,255,0.14);
+}
+/* Dragging over the current number shows it's still the one you'd pick. */
+.mode-selector .mode-count-option.current.hover {
+	box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
 }
 .mode-selector .mode-count-option.current {
 	background: #f2f2f4;

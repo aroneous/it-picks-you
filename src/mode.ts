@@ -81,10 +81,13 @@ export function countOptions(kind: ModeKind): number[] {
   return Array.from({ length: MAX_COUNT - minCount(kind) + 1 }, (_, i) => minCount(kind) + i);
 }
 
-/** The other modes, in knob order starting after `kind`: what the long-press menu lists below it. */
+/**
+ * The other modes, as the long-press menu lists them below `kind`: in reverse knob order,
+ * so the next mode is at the bottom and, like a knob tap's capsule, wraps round from above.
+ */
 export function otherKinds(kind: ModeKind): ModeKind[] {
   const i = MODE_KINDS.indexOf(kind);
-  return [1, 2].map(step => MODE_KINDS[(i + step) % MODE_KINDS.length]);
+  return [2, 1].map(step => MODE_KINDS[(i + step) % MODE_KINDS.length]);
 }
 
 /** How many knob steps forward it takes to get from one mode to another. */

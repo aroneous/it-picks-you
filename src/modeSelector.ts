@@ -46,66 +46,90 @@ const KNOB_STEP = 360 / MODE_KINDS.length; // degrees
 const BELOW = 'translateY(14px) scale(0.8)';
 const ABOVE = 'translateY(-14px) scale(0.8)';
 
-/**
- * Makes a picker's options ignore clicks until a press starts inside the picker. The
- * long press that opened it ends with a click that can land on whatever option now sits
- * under the finger; that one mustn't choose it. Keyboard clicks (`detail` 0) always count.
- */
-function guardClicks(picker: HTMLElement): (e: MouseEvent) => boolean {
-  let armed = false;
-  picker.addEventListener('pointerdown', () => (armed = true));
-  return e => armed || e.detail === 0;
-}
-
 function reduceMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 }
 
+/** A press that's still down when its long press fires: which pointer, and where it is now. */
+interface Press {
+  id: number;
+  x: number;
+  y: number;
+}
+
 /**
- * Calls `onLongPress` when `el` is held still for `LONG_PRESS_TIME`, and swallows the
- * click that follows so the element's tap action doesn't also run. A right click (or a
- * long press the browser reports as `contextmenu`) opens it too.
+ * Set when a long press fires: the click that ends it is swallowed wherever it lands. It
+ * can land on the element pressed, on a picker option now under the pointer, or (with a
+ * mouse, pressed on one element and released over another) on their common ancestor.
+ * Cleared by the next press, in case no click comes.
  */
-function addLongPress(el: HTMLElement, onLongPress: () => void): void {
+let swallowClick = false;
+let swallowInstalled = false;
+
+function installClickSwallow(): void {
+  if (swallowInstalled) return;
+  swallowInstalled = true;
+  document.addEventListener('pointerdown', () => (swallowClick = false), true);
+  document.addEventListener('click', e => {
+    if (!swallowClick || !e.isTrusted) return;
+    swallowClick = false;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
+}
+
+/**
+ * Calls `onLongPress` when `el` is held still for `LONG_PRESS_TIME`, passing the press if
+ * it's still down (so a drag can carry on into the picker), and swallows the click that
+ * follows so the element's tap action doesn't also run. A right click (or a long press
+ * the browser reports as `contextmenu`) opens it too.
+ */
+function addLongPress(el: HTMLElement, onLongPress: (press: Press | null) => void): void {
+  installClickSwallow();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let start = { x: 0, y: 0 };
-  /** A long press just fired: swallow its click. Reset on the next press, in case no click comes. */
+  let press: Press | null = null;
+  /** The long press for the current press has fired. */
   let fired = false;
   const cancel = () => {
     if (timer !== null) clearTimeout(timer);
     timer = null;
   };
+  const fire = () => {
+    fired = true;
+    swallowClick = press !== null;
+    navigator.vibrate?.(10);
+    onLongPress(press);
+  };
   el.addEventListener('pointerdown', e => {
     fired = false;
+    press = null;
     if (!e.isPrimary || e.button !== 0) return;
     start = { x: e.clientX, y: e.clientY };
+    press = { id: e.pointerId, ...start };
     cancel();
     timer = setTimeout(() => {
       timer = null;
-      fired = true;
-      navigator.vibrate?.(10);
-      onLongPress();
+      fire();
     }, LONG_PRESS_TIME);
   });
   el.addEventListener('pointermove', e => {
+    if (press?.id === e.pointerId) press = { id: e.pointerId, x: e.clientX, y: e.clientY };
     if (timer !== null && Math.hypot(e.clientX - start.x, e.clientY - start.y) > LONG_PRESS_SLOP) cancel();
   });
-  for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) el.addEventListener(type, cancel);
+  const release = () => {
+    cancel();
+    press = null;
+  };
+  for (const type of ['pointerup', 'pointercancel'] as const) el.addEventListener(type, release);
+  el.addEventListener('pointerleave', cancel);
   el.addEventListener('contextmenu', e => {
     e.preventDefault();
     if (fired) return;
-    // A press still down when the browser calls it a context menu is a long press, so its click is swallowed too.
-    if (timer !== null) fired = true;
+    // The browser can call a long press a context menu before our timer does.
     cancel();
-    onLongPress();
+    fire();
   });
-  // Capture listeners run before the element's own click listener.
-  el.addEventListener('click', e => {
-    if (!fired) return;
-    fired = false;
-    e.stopImmediatePropagation();
-    e.preventDefault();
-  }, true);
 }
 
 /**
@@ -295,21 +319,57 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
     closeCountPane(instant);
   }
 
+  /**
+   * After a long press opens `picker` with the press still down: sliding onto an option
+   * highlights it, and letting go there chooses it. Letting go without having moved leaves
+   * the picker open for a tap.
+   */
+  function dragToChoose(picker: HTMLElement, press: Press | null) {
+    if (!press) return;
+    let dragging = false;
+    let hover: HTMLElement | null = null;
+    const optionAt = (x: number, y: number) => {
+      const option = document.elementFromPoint(x, y)?.closest<HTMLElement>('.mode-option, .mode-count-option');
+      return option && picker.contains(option) && !option.classList.contains('leaving') ? option : null;
+    };
+    const setHover = (option: HTMLElement | null) => {
+      hover?.classList.remove('hover');
+      hover = option;
+      hover?.classList.add('hover');
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerId !== press.id) return;
+      if (!dragging && Math.hypot(e.clientX - press.x, e.clientY - press.y) > LONG_PRESS_SLOP) dragging = true;
+      if (dragging) setHover(optionAt(e.clientX, e.clientY));
+    };
+    const end = (e: PointerEvent) => {
+      if (e.pointerId !== press.id) return;
+      setHover(null);
+      document.removeEventListener('pointermove', move, true);
+      document.removeEventListener('pointerup', end, true);
+      document.removeEventListener('pointercancel', end, true);
+      const open = picker === menu || picker === pane;
+      if (e.type === 'pointerup' && dragging && open) optionAt(e.clientX, e.clientY)?.click();
+    };
+    document.addEventListener('pointermove', move, true);
+    document.addEventListener('pointerup', end, true);
+    document.addEventListener('pointercancel', end, true);
+  }
+
   // ---- The knob's long-press menu: every mode as a capsule ----
 
   let menu: HTMLElement | null = null;
 
-  function openModeMenu() {
+  function openModeMenu(press: Press | null = null) {
     if (menu || hidden) return;
     closeCountPane(true);
     const el = document.createElement('div');
     el.className = 'mode-menu';
     el.setAttribute('role', 'group');
     el.setAttribute('aria-label', 'Choose a mode');
-    const counts = guardClicks(el);
     otherKinds(settings.kind).forEach((kind, i) => {
       const option = buildCapsule(modeOf(withKind(settings, kind)), true);
-      option.addEventListener('click', e => counts(e) && chooseKind(kind, option));
+      option.addEventListener('click', () => chooseKind(kind, option));
       el.appendChild(option);
       if (!reduceMotion()) {
         // The reverse of leaving: up from below, growing and fading in.
@@ -322,6 +382,7 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
     slot.appendChild(el);
     menu = el;
     setPickerOpen(true);
+    dragToChoose(el, press);
     (el.firstElementChild as HTMLElement | null)?.focus({ preventScroll: true });
   }
 
@@ -363,7 +424,7 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
 
   let pane: HTMLElement | null = null;
 
-  function openCountPane() {
+  function openCountPane(press: Press | null = null) {
     if (pane || hidden || !hasCount(settings.kind)) return;
     closeModeMenu(true);
     const chip = capsule.querySelector<HTMLElement>('.mode-count');
@@ -374,7 +435,6 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
     el.className = 'mode-count-pane';
     el.setAttribute('role', 'group');
     el.setAttribute('aria-label', `Number of ${kind}`);
-    const counts = guardClicks(el);
     countOptions(kind).forEach(count => {
       const option = document.createElement('button');
       option.type = 'button';
@@ -382,7 +442,7 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
       option.textContent = String(count);
       option.setAttribute('aria-pressed', String(count === current));
       option.classList.toggle('current', count === current);
-      option.addEventListener('click', e => counts(e) && chooseCount(count));
+      option.addEventListener('click', () => chooseCount(count));
       el.appendChild(option);
     });
     // Unrolls downward from the number itself: the first option sits where the number was.
@@ -394,6 +454,7 @@ export function createModeSelector(initial: ModeSettings, onChange: (mode: Mode)
     slot.appendChild(el);
     pane = el;
     setPickerOpen(true);
+    dragToChoose(el, press);
     (el.querySelector<HTMLElement>('.current') ?? el.firstElementChild as HTMLElement | null)?.focus({ preventScroll: true });
     if (reduceMotion()) return;
     el.animate(

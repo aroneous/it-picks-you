@@ -91,10 +91,10 @@ describe('mode', () => {
       expect(countOptions('rank')).toEqual([]);
     });
 
-    it('lists the other modes in knob order after the current one', () => {
-      expect(otherKinds('players')).toEqual(['teams', 'rank']);
-      expect(otherKinds('teams')).toEqual(['rank', 'players']);
-      expect(otherKinds('rank')).toEqual(['players', 'teams']);
+    it('lists the other modes in reverse knob order, the next one last', () => {
+      expect(otherKinds('players')).toEqual(['rank', 'teams']);
+      expect(otherKinds('teams')).toEqual(['players', 'rank']);
+      expect(otherKinds('rank')).toEqual(['teams', 'players']);
     });
 
     it('counts knob steps forward between modes', () => {

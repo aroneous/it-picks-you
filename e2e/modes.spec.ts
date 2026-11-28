@@ -77,11 +77,12 @@ test.describe('mode selector', () => {
     await longPress(page, page.locator('.mode-knob'));
     // The long press doesn't also turn the knob.
     await expect(capsule(page)).toHaveText(/Choose\s*1\s*player$/);
+    // In reverse knob order: the next mode (Split) is last, wrapping round as a knob tap's does from above.
     await expect(options).toHaveCount(2);
-    await expect(options.nth(0)).toHaveText(/Split\s*into\s*2\s*teams/);
-    await expect(options.nth(1)).toHaveText(/Rank\s*all players/);
+    await expect(options.nth(0)).toHaveText(/Rank\s*all players/);
+    await expect(options.nth(1)).toHaveText(/Split\s*into\s*2\s*teams/);
 
-    await options.nth(1).click();
+    await options.nth(0).click();
     await expect(capsule(page)).toHaveText(/Rank\s*all players/);
     await expect(page.locator('.mode-menu')).toHaveCount(0);
     await expect(page.locator('.mode-capsule')).toHaveCount(1);
@@ -91,7 +92,7 @@ test.describe('mode selector', () => {
     await page.locator('.mode-knob').click();
     await expect(capsule(page)).toHaveText(/Choose\s*1\s*player$/);
     await longPress(page, page.locator('.mode-knob'));
-    await options.nth(0).click();
+    await options.nth(1).click();
     await page.reload();
     await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
   });
@@ -127,6 +128,48 @@ test.describe('mode selector', () => {
     await page.keyboard.press('Escape');
     await expect(pane).toHaveCount(0);
     await expect(capsule(page)).toHaveText(/Split\s*into\s*2\s*teams/);
+  });
+
+  test('with a mouse, a long press stays open on release, and dragging onto a number chooses it', async ({ page }) => {
+    await page.goto('/');
+    const count = capsule(page).locator('.mode-count');
+    const pane = page.locator('.mode-count-pane');
+    const box = (await count.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await expect(pane).toBeVisible();
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    await expect(pane).toBeVisible();
+    await expect(count).toHaveText('1');
+    await page.keyboard.press('Escape');
+    await expect(pane).toHaveCount(0);
+
+    await page.mouse.down();
+    await expect(pane).toBeVisible();
+    const three = (await pane.getByRole('button', { name: '3' }).boundingBox())!;
+    await page.mouse.move(three.x + three.width / 2, three.y + three.height / 2, { steps: 5 });
+    await expect(pane.locator('.hover')).toHaveText('3');
+    await page.mouse.up();
+    await expect(pane).toHaveCount(0);
+    await expect(capsule(page)).toHaveText(/Choose\s*3\s*players/);
+  });
+
+  test('a touch can slide from the knob onto a mode and let go to choose it', async ({ page }) => {
+    await page.goto('/');
+    const knob = (await page.locator('.mode-knob').boundingBox())!;
+    const fingers = await Fingers.attach(page);
+    const finger = { id: 7, x: knob.x + knob.width / 2, y: knob.y + knob.height / 2 };
+    await fingers.place(finger);
+    const rank = page.locator('.mode-option', { hasText: 'Rank' });
+    await expect(rank).toBeVisible();
+    await page.waitForTimeout(300); // let the options finish growing in
+    const target = (await rank.boundingBox())!;
+    await fingers.move({ ...finger, x: target.x + 30, y: target.y + target.height / 2 });
+    await expect(rank).toHaveClass(/hover/);
+    await fingers.liftAll();
+    await expect(page.locator('.mode-menu')).toHaveCount(0);
+    await expect(capsule(page)).toHaveText(/Rank\s*all players/);
   });
 
   test('hides while fingers are on the screen', async ({ page }) => {
